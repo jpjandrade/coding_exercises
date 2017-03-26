@@ -41,3 +41,26 @@ print ${ $hashRef }{"Helium"};  # use a reference to get to the hash
 print $hashRef->{"Helium"};     # exactly the same thing - this is very common
 
 print "\n\n";
+
+# using brackets to define references
+
+# Braces denote an anonymous hash
+my $owner1Ref = {
+    "name" => "Santa Claus",
+    "DOB"  => "1882-12-25",
+};
+
+my $owner2Ref = {
+    "name" => "Mickey Mouse",
+    "DOB"  => "1928-11-18",
+};
+
+# Square brackets denote an anonymous array
+my $ownersRef = [ $owner1Ref, $owner2Ref ];
+
+# this is equivalent to 
+my %account = (
+    "number" => "12345678",
+    "opened" => "2000-01-01",
+    "owners" => $ownersRef,
+);
