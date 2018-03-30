@@ -2,7 +2,6 @@ use 5.26.0;
 
 use warnings;
 use strict;
-use Data::Dumper;
 
 my $first_name = 'João Pedro';
 my $last_name = "Andrade";
@@ -51,4 +50,3 @@ foreach (1 .. 5){
 # can also be
 
 say "$_ + $_^2 = ", $_ + $_ ** 2 for 1 .. 5;  # this is fun and worrying
-
