@@ -9,8 +9,6 @@ class Rational(n: Int, d: Int){
 
   def this(n: Int) = this(n, 1)
 
-
-
   override def toString: String = numer + "/" + denom
 
   private def gcd(a: Int, b: Int): Int =
@@ -22,9 +20,35 @@ class Rational(n: Int, d: Int){
       denom * that.denom)
   }
 
-  def *(that: Rational) = {
+  def +(i: Int): Rational = {
+    new Rational(numer + i * denom, denom)
+  }
+
+  def *(that: Rational): Rational = {
+    new Rational(numer * that.numer, denom * that.denom)
+  }
+
+  def *(i: Int): Rational = {
+    new Rational(numer * i, denom)
+  }
+  def -(that: Rational): Rational = {
+    new Rational(
+      numer * that.denom - denom * that.numer,
+      denom * that.denom)
+  }
+
+  def -(i: Int): Rational = {
+    new Rational(numer - i * denom, denom)
+  }
+
+  def / (that: Rational): Rational = {
     new Rational(numer * that.denom, denom * that.numer)
   }
+
+  def / (i: Int): Rational = {
+    new Rational(numer, denom * i)
+  }
+
 
   def lessThan(that: Rational) =
     this.numer * that.denom < that.numer * this.denom
@@ -35,10 +59,12 @@ class Rational(n: Int, d: Int){
 
 }
 
+implicit def intToRational(x: Int) = new Rational(x)
+
 
 val a = new Rational(2, 3)
 
-val b =new Rational(5, 10)
+val b = new Rational(5, 10)
 
 a + b
 
@@ -48,4 +74,9 @@ c max (a + b)
 
 c max a * b
 
+a * a
+
+a * 2
+
+2 * a
 
