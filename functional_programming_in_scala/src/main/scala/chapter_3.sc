@@ -24,11 +24,13 @@ object chapter_3 {
   // my answer
   assert(x == 3)
 
+  // ex 3.2
   def tail[A](xs: List[A]): List[A] = xs match {
     case Nil => Nil // or throw error?
     case Cons(_, x) => x
   }
 
+  // ex 3.3
   def setHead[A](xs: List[A], a: A): List[A] = xs match {
     case Nil => Nil
     case Cons(_, x) => Cons(a, x) // or a :: xs.tail?
@@ -37,6 +39,7 @@ object chapter_3 {
   tail(l1)
   setHead(l2, 5.0)
 
+  // ex 3.4
   def drop[A](l: List[A], n: Int): List[A] = {
     def go(xs: List[A], i: Int): List[A] =
       if (i == n)
@@ -48,5 +51,76 @@ object chapter_3 {
   }
 
   drop(l1, 2)
+
+  // ex 3.5
+  // had solved as "filter"" function then corrected it
+  def dropWhile[A](l: List[A], f: A => Boolean): List[A] =
+    l match {
+      case Cons(h,t) if f(h) => dropWhile(t, f)
+      case _ => l
+    }
+
+  def isOdd(n: Int): Boolean = {
+    n % 2 == 1
+  }
+
+  dropWhile(l1, isOdd)
+
+  // ex 3.6
+  // had to look it up :-(
+  def init[A](l: List[A]): List[A] = {
+    l match {
+      case Cons(_, Nil) => Nil
+      case Cons(x, h) => Cons(x, init(h))
+      case Nil => Nil
+    }
+  }
+
+  init(l1)
+
+  def dropWhileCurried[A](l: List[A])(f: A => Boolean): List[A] =
+    l match {
+      case Cons(h,t) if f(h) => dropWhile(t, f)
+      case _ => l
+    }
+
+  dropWhileCurried(l1)(_ % 2 == 1) // aahh much better
+
+  def foldRight[A, B](as: List[A], z: B)(f: (A, B) => B): B = {
+    as match {
+      case Nil => z
+      case Cons(x, xs) => f(x, foldRight(xs, z)(f))
+    }
+  }
+
+  def sum2(ns: List[Int]): Int = {
+    foldRight(ns, 0)((x, y) => x + y)
+  }
+
+  def product2(ns: List[Double]): Double = {
+    foldRight(ns, 1.0)((x, y) => x * y)
+  }
+
+  // ex 3.7
+
+  def productWithShortCircuit(ns: List[Double]): Double = {
+    ns match {
+      case Cons(0.0, _) => 0.0
+      case _ => foldRight(ns, 1.0)(_ * _)
+    }
+  }
+
+  productWithShortCircuit(l2)
+
+  // ex 3.8
+  foldRight(List(1, 2, 3), Nil: List[Int])(Cons(_, _))
+  // this is just apply construction
+
+  // ex 3.9
+  def length[A](as: List[A]): Int = {
+    foldRight(as, 0)((_, l) => l + 1)
+  }
+
+  length(l1)
 
 }
