@@ -66,6 +66,13 @@ object chapter_3 {
 
   dropWhile(l1, isOdd)
 
+  def append[A](a1: List[A], a2: List[A]): List[A] =
+    a1 match {
+      case Nil => a2
+      case Cons(h, t) => Cons(h, append(t, a2))
+    }
+
+
   // ex 3.6
   // had to look it up :-(
   def init[A](l: List[A]): List[A] = {
@@ -93,11 +100,11 @@ object chapter_3 {
     }
   }
 
-  def sum2(ns: List[Int]): Int = {
+  def sumFoldRight(ns: List[Int]): Int = {
     foldRight(ns, 0)((x, y) => x + y)
   }
 
-  def product2(ns: List[Double]): Double = {
+  def productFoldRight(ns: List[Double]): Double = {
     foldRight(ns, 1.0)((x, y) => x * y)
   }
 
@@ -123,4 +130,45 @@ object chapter_3 {
 
   length(l1)
 
+
+  // ex 3.10
+  def foldLeft[A, B](as: List[A], z: B)(f: (B, A) => B): B ={
+    as match {
+      case Nil => z
+      case Cons(x, xs) => foldLeft(xs, f(z, x))(f)
+    }
+  }
+
+  // ex 3.11
+  def sumFoldLeft(ns: List[Int]): Int = {
+    foldLeft(ns, 0)((x, y) => x + y)
+  }
+
+  def productFoldLeft(ns: List[Double]): Double = {
+    foldLeft(ns, 1.0)((x, y) => x * y)
+  }
+
+  def lengthFoldLeft[A](as: List[A]): Int = {
+    foldLeft(as, 0)((l, _) => l + 1)
+  }
+
+  sumFoldLeft(l1)
+
+  productFoldLeft(l2)
+
+  lengthFoldLeft(l2)
+
+  // ex 3.12
+  // looked it up because I was mixing List[A] with A
+  def reverse[A](as: List[A]): List[A] = {
+    foldLeft(as, List[A]())((xs, x) => Cons(x, xs))
+  }
+
+  reverse(l1)
+  // ex 3.14
+  def appendFold[A](a1: List[A], a2: List[A]): List[A] = {
+    foldRight(a1, a2)((x, xs) => Cons(x, xs))
+  }
+
+  appendFold(l1, Cons(2, Cons(5, Nil)))
 }
