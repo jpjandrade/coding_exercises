@@ -1,6 +1,8 @@
 import fpinscala.list.{Nil, Cons, List}
 import fpinscala.list.List.{product, sum}
 
+import scala.math.pow
+
 object chapter_3 {
   // sum example
 
@@ -171,4 +173,85 @@ object chapter_3 {
   }
 
   appendFold(l1, Cons(2, Cons(5, Nil)))
+
+  // ex 3.16
+
+  def addOne(as: List[Int]): List[Int] = as match {
+    case Nil => Nil
+    case Cons(x, xs) => Cons(x + 1, addOne(xs))
+  }
+
+  addOne(l1)
+
+  // ex 3.17, now rewritten as a foldright
+  def doubleToString(as: List[Double]): List[String] =
+    foldRight(as, Nil: List[String])((x, xs) => Cons(x.toString, xs))
+
+  doubleToString(l2)
+
+  // ex 3.18
+  def map[A, B](as: List[A])(f: A => B): List[B] =
+    foldRight(as, Nil: List[B])((x, xs) => Cons(f(x), xs))
+
+  map(l1)(pow(_, 2))
+
+  // ex 3.19 (could also have been done via foldRight)
+  def filter[A](as: List[A])(f: A => Boolean): List[A] = as match {
+    case Nil => Nil
+    case Cons(x, xs) => if (f(x)) Cons(x, filter(xs)(f)) else filter(xs)(f)
+  }
+
+  filter(l1)(_ % 2 == 0)
+
+  // ex 3.20
+
+  def flatMap[A, B](as: List[A])(f: A => List[B]): List[B] =
+    foldRight(as, Nil: List[B])((x, xs) => append(f(x), xs))
+
+  flatMap(l1)(i => List(i, i))
+
+  // ex 3.21
+  def filterViaFlatMap[A](as: List[A])(f: A => Boolean): List[A] =
+    flatMap(as)(x => if(f(x)) Cons(x, Nil) else Nil)
+
+  filterViaFlatMap((l1))(_ % 2 == 0)
+
+  // ex 3.22
+  def addListElementwise(as1: List[Int], as2: List[Int]): List[Int] = as1 match {
+    case Nil => Nil
+    case Cons(x, xs) => as2 match {
+      case Nil => Nil
+      case Cons(y, ys) => Cons(x + y, addListElementwise(xs, ys))
+    }
+  }
+
+  addListElementwise(l1, l1)
+
+  // ex 3.22 after looking up solution
+  def addListElementwiseBetter(as1: List[Int], as2: List[Int]): List[Int] = (as1, as2) match {
+    case (Nil, _) => Nil
+    case (_, Nil) => Nil
+    case (Cons(x, xs), Cons(y, ys)) => Cons(x + y, addListElementwiseBetter(xs, ys))
+  }
+
+  // ex 3.23
+  def zipWith[A, B](as1: List[A], as2: List[A])(f: (A, A) => B): List[B] = (as1, as2) match {
+    case (Nil, _) => Nil
+    case (_, Nil) => Nil
+    case (Cons(x, xs), Cons(y, ys)) => Cons(f(x, y), zipWith(xs, ys)(f))
+  }
+  zipWith(l2, l2)(pow(_, _))
+
+  // ex 3.24
+  def hasSubsequence[A](sup: List[A], sub: List[A]): Boolean = sup match {
+    case Nil => false
+    case Cons(x, xs) => // checks with result of zipWith equality is of the size of sub
+      if(foldLeft(zipWith(sup, sub)(_ == _), 0)((z, bool) => if(bool) z + 1 else z) == lengthFoldLeft(sub))
+        true
+      else
+        hasSubsequence(xs, sub)
+  }
+
+  hasSubsequence(l1, Cons(2, Cons(3, Nil)))
+
 }
