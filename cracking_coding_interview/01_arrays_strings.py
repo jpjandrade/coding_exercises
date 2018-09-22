@@ -76,3 +76,29 @@ def urlify(s):
             idx += 1
     final_string = ''.join(new_string)
     return final_string
+
+
+# 1.4
+
+def palindrome_checker(s):
+    char_count = {}
+    for c in s:
+        if c != ' ':
+            if c in char_count:
+                char_count[c] += 1
+            else:
+                char_count[c] = 1
+
+    even = 0
+    odds = 0
+
+    for c in char_count:
+        if char_count[c] % 2 == 0:
+            even += 1
+        else:
+            odds += 1
+
+    if odds >= 1:
+        return True
+    else:
+        return False
