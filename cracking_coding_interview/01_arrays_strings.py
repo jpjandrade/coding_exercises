@@ -14,7 +14,7 @@ def check_string(s):  # O(n)
 
 
 def check_string_no_hash(s):  # this is O(n^2)
-    for i in len(s):
+    for i in range(len(s)):
         c = s[i]
         for j in range(i):
             if s[j] == c:
@@ -46,3 +46,33 @@ def check_if_permutation(s1, s2):
             return False
 
     return True
+
+
+# 1.3
+# we'll only strip the spaces in the end of the string
+
+def urlify(s):
+    last_idx = len(s) - 1
+
+    while s[last_idx] == ' ' and last_idx > 0:
+        last_idx -= 1
+    effective_length = last_idx + 1
+
+    spaces_count = 0
+    for i in range(effective_length):  # O(n)
+        if s[i] == ' ':
+            spaces_count += 1
+
+    new_string = [None for i in range(effective_length + 2 * spaces_count)]
+    idx = 0
+    for i in range(effective_length):
+        if s[i] == ' ':
+            new_string[idx] = '%'
+            new_string[idx + 1] = '2'
+            new_string[idx + 2] = '0'
+            idx += 3
+        else:
+            new_string[idx] = s[i]
+            idx += 1
+    final_string = ''.join(new_string)
+    return final_string
