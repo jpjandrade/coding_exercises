@@ -1,0 +1,3 @@
+This folder contains my solutions for the problems in the [Cracking the Coding Interview](https://www.amazon.com/Cracking-Coding-Interview-Programming-Questions/dp/0984782850/ref=pd_lpo_sbs_14_t_0?_encoding=UTF8&psc=1&refRID=RJKD1EHC2Q3R7YVYPE8Z) book. These were solved and written with pen and paper and then copied to a python script to check for bugs and testing. They are not supposed to represent "production quality" code but what I could come up with in a concise version that solved the problem well. Corrections were only made if testing would error out or something.
+
+These are not guaranteed to be useful for anyone but if you find a mistake please let me know :-D
