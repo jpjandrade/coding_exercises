@@ -80,7 +80,7 @@ def urlify(s):
 
 # 1.4
 
-def palindrome_checker(s):
+def check_if_palindrome(s):
     char_count = {}
     for c in s:
         if c != ' ':
@@ -102,3 +102,80 @@ def palindrome_checker(s):
         return True
     else:
         return False
+
+
+# 1.5
+
+def check_one_edit(s1, s2):
+    if abs(len(s1) - len(s2)) > 1:
+        return False
+    elif abs(len(s1) - len(s2)) == 1:
+        return check_for_insert(s1, s2)
+    else:
+        return check_for_replace(s1, s2)
+
+
+def check_for_replace(s1, s2):
+    assert(len(s1) == len(s2))  # just to be sure :-P
+    edit_found = False
+    for i in range(len(s1)):
+        if s1[i] != s2[i]:
+            if edit_found:
+                return False
+            else:
+                edit_found = True
+
+    return True
+
+
+def check_for_insert(s1, s2):
+    if len(s1) > len(s2):
+        g = s1
+        l = s2
+    else:
+        g = s2
+        l = s1
+
+    idx = -1
+    insert_found = False
+    for i in range(len(l)):
+        idx += 1
+        if g[idx] != l[i]:
+            if insert_found:
+                return False
+            else:
+                insert_found = True
+                idx += 1
+                if g[idx] != l[i]:
+                    return False
+
+    return True
+
+
+# ex 1.6
+
+def compress_string(s):
+    compressed = ['' for i in range(2 * len(s))]  # worst case scenario
+    curr_char = s[0]
+    curr_count = 1
+    idx = 0
+    for i in range(1, len(s)):
+        c = s[i]
+        if c == curr_char:
+            curr_count += 1
+        else:
+            compressed[idx] = curr_char
+            compressed[idx + 1] = str(curr_count)
+            idx += 2
+            curr_char = c
+            curr_count = 1
+
+    compressed[idx] = curr_char
+    compressed[idx + 1] = str(curr_count)
+
+    compressed_string = ''.join(compressed)
+
+    if len(compressed_string) < len(s):
+        return compressed_string
+    else:
+        return s
