@@ -1,5 +1,6 @@
 import fpinscala.list.{Nil, Cons, List}
 import fpinscala.list.List.{product, sum}
+import fpinscala.tree._
 
 import scala.math.pow
 
@@ -214,7 +215,7 @@ object chapter_3 {
   def filterViaFlatMap[A](as: List[A])(f: A => Boolean): List[A] =
     flatMap(as)(x => if(f(x)) Cons(x, Nil) else Nil)
 
-  filterViaFlatMap((l1))(_ % 2 == 0)
+  filterViaFlatMap(l1)(_ % 2 == 0)
 
   // ex 3.22
   def addListElementwise(as1: List[Int], as2: List[Int]): List[Int] = as1 match {
@@ -254,4 +255,72 @@ object chapter_3 {
 
   hasSubsequence(l1, Cons(2, Cons(3, Nil)))
 
+  // trees! here's examples to be used to test
+  val t1 = Branch(Branch(Leaf(2), Leaf(3)), Branch(Leaf(1), Leaf(5)))
+  val t2 = Branch(Branch(Leaf(2), Leaf(3)), Branch(Branch(Leaf(-2), Leaf(5)), Leaf(10)))
+
+  // ex 3.25
+ def size[A](t: Tree[A]): Int = t match {
+   case Leaf(_) => 1
+   case Branch(l, r) => 1 + size(l) + size(r)
+   case _ => 0
+ }
+
+  size(t1)
+  size(t2)
+
+  // ex 3.26
+  // totally ignored null cases here :-P
+
+  def max(t: Tree[Int]): Int = t match {
+    case Leaf(d) => d
+    case Branch(l, r) => max(l).max(max(r))
+  }
+  max(t1)
+  max(t2)
+
+  // ex 3.27
+  // getting silly
+  def depth[A](t: Tree[A]): Int = t match {
+    case Leaf(_) => 0
+    case Branch(l, r) => 1 + depth(l).max(depth(r))
+  }
+  depth(t1)
+  depth(t2)
+
+  // ex 3.28
+  def map[A, B](t: Tree[A])(f: A => B): Tree[B] = t match {
+    case Leaf(d) => Leaf(f(d))
+    case Branch(l, r) => Branch(map(l)(f), map(r)(f))
+  }
+
+  map(t1)(_ * 2)
+  map(t2)(scala.math.pow(_, 2))
+
+  // ex 3.29
+  def fold[A, B](t: Tree[A])(f: A => B)(g: (B, B) => B): B = t match {
+    case Leaf(d) => f(d)
+    case Branch(l, r) => g(fold(l)(f)(g), fold(r)(f)(g))
+  }
+
+  def sizeWithFold[A](t: Tree[A]): Int =
+    fold(t)(_ => 1)((a, b) => 1 + a + b)
+
+  sizeWithFold(t1)
+
+  def maxWithFold(t: Tree[Int]): Int =
+    fold(t)(d => d)((a, b) => a.max(b))
+
+  maxWithFold(t2)
+
+  def depthWithFold[A](t: Tree[A]): Int =
+    fold(t)(_ => 0)((a, b) => 1 + a.max(b))
+
+  depthWithFold(t2)
+
+  // had to look at answer, my Scala was totally confused with types :-(
+  def mapWithFold[A, B](t: Tree[A])(f: A => B): Tree[B] =
+    fold(t)(a => Leaf(f(a)): Tree[B])((a, b) => Branch(a, b))
+
+  mapWithFold(t2)(scala.math.pow(_, 0)) // /shrug
 }
