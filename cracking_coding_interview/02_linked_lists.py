@@ -30,7 +30,7 @@ class Node:
         n.next = end
 
 
-def delete_node(head, d):
+def delete_value(head, d):
     n = head
 
     if n.data == d:
@@ -82,3 +82,35 @@ def remove_dups_no_hash(head):
         n.next = delete_nodes(n.next, n.data)
         n = n.next
     return head
+
+
+# 2.2
+# I assume k = 1 means last entry
+def kth_to_last(head, k):
+    count = 0
+    n = head
+    delayed_head = None
+    if k == 1 and head.next is None:  # whoo corner cases!
+        return head.data
+    while n.next is not None:
+        if count == k - 1:
+            delayed_head = head
+        n = n.next
+        count += 1
+        if delayed_head is not None:
+            delayed_head = delayed_head.next
+
+    if count == k - 1:
+            delayed_head = head
+
+    if delayed_head is not None:
+        return delayed_head.data
+    else:
+        raise ValueError("k is larger than the list")
+
+
+# 2.3
+# I didn't check for None because it says it isn't the first or last
+def delete_this_node(head):
+    head.data = head.next.data
+    head.next = head.next.next
