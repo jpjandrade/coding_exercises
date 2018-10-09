@@ -110,7 +110,7 @@ def kth_to_last(head, k):
 
 
 # 2.3
-# I didn't check for None because it says it isn't the first or last
+# I didn't check for data or next being None because exercise says it isn't the first or last
 def delete_this_node(head):
     head.data = head.next.data
     head.next = head.next.next

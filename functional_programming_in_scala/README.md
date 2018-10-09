@@ -2,4 +2,4 @@ This folder contains my solutions for the exercises in the excellent [Functional
 
 Most of the exercises were solved without help, but some I had to look up and the answer, and I do a honor code style and point that out in the exercise.
 
-Scala is fun y'all! :-D
+Scala is fun y'all! ᕕ( ᐛ )ᕗ
