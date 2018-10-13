@@ -62,3 +62,25 @@ class Queue:
 
     def is_empty(self):
         return self.first is None
+
+
+# ex 3.2
+
+class StackMin(Stack):
+    def __init__(self):
+        super().__init__()
+        self.min_stack = Stack()
+
+    def pop(self):
+        item = super().pop()
+        if item == self.min_stack.peek():
+            self.min_stack.pop()
+        return item
+
+    def push(self, item):
+        super().push(item)
+        if self.min_stack.is_empty() or item <= self.min():
+            self.min_stack.push(item)
+
+    def min(self):
+        return self.min_stack.peek()
