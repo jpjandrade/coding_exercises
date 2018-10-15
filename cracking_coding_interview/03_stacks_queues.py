@@ -84,3 +84,52 @@ class StackMin(Stack):
 
     def min(self):
         return self.min_stack.peek()
+
+# 3.3
+
+class SetOfStacks:
+
+    def __init__(self):
+        self.MAX_STACKS = 3
+        self.MAX_SIZE = 2
+
+        self.all_stacks = [Stack() for i in range(self.MAX_STACKS)]
+        self.current_stack = 0
+        self.stack_sizes = [0 for i in range(self.MAX_STACKS)]
+        self.all_full = False
+
+    def pop(self):
+        s = self.all_stacks[self.current_stack]
+        item = s.pop()
+        self.stack_sizes[self.current_stack] -= 1
+        if s.is_empty() and self.current_stack > 0:
+            self.current_stack -= 1
+        if self.all_full:
+            self.all_full = False
+        return item
+
+    def push(self, item):
+        if self.all_full:
+            raise ValueError("All stacks full!")
+        s = self.all_stacks[self.current_stack]
+        s.push(item)
+        self.stack_sizes[self.current_stack] += 1
+        while not self.all_full and self.stack_sizes[self.current_stack] == self.MAX_SIZE:
+            self.current_stack += 1
+            if self.current_stack == self.MAX_STACKS:
+                self.all_full = True
+
+    def peek(self):
+        s = self.all_stacks[self.current_stack]
+        item = s.peek()
+        return item
+
+    def pop_at(self, index):
+        s = self.all_stacks[index]
+        item = s.pop()
+        self.stack_sizes[index] -= 1
+        if self.current_stack > index:
+            self.current_stack = index
+        if self.all_full:
+            self.all_full = False
+        return item
