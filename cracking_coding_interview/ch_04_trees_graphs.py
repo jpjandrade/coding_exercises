@@ -1,4 +1,5 @@
 import random
+from ch_02_linked_lists import ListNode
 from ch_03_stacks_queues import Queue
 
 # binary tree definitions
@@ -199,4 +200,49 @@ def create_minimal_tree_root(sorted_arr):
     return root
 
 
+# ex 4.3
 
+# I decided to implement the "list of list" element as an array
+# and I do "append" at every new depth level. This is inefficient
+# and I could get better performance by doing a linked list at that
+# level as well.
+
+
+def num_of_children(node):
+    has_left = node.left is not None
+    has_right = node.right is not None
+    return int(has_left) + int(has_right)
+
+
+def nodes_per_depth(node):
+    all_lists = []
+    if node is None:
+        return all_lists
+    q = Queue()
+    q.add(node)
+    count = 0
+    level = 0
+    curr_max = 1
+    next_max = 0
+    all_lists.append(None)
+    while not q.is_empty():
+        n = q.remove()
+        curr_list = all_lists[level]
+        new_list = ListNode(n.data)
+        new_list.next = curr_list
+        all_lists[level] = new_list
+        next_max += num_of_children(n)
+        count += 1
+        if n.left is not None:
+            q.add(n.left)
+        if n.right is not None:
+            q.add(n.right)
+        if count >= curr_max:
+            curr_max = next_max
+            next_max = 0
+            count = 0
+            level += 1
+            if not q.is_empty():
+                all_lists.append(None)
+
+    return all_lists

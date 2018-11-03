@@ -1,7 +1,7 @@
 # first an implementation of a linked list in python for practicing examples
 
 
-class Node:
+class ListNode:
     def __init__(self, d):
         self.data = d
         self.next = None
@@ -22,7 +22,7 @@ class Node:
         return str(self)
 
     def append_to_tail(self, d):
-        end = Node(d)
+        end = ListNode(d)
         n = self
         while n.next is not None:
             n = n.next
