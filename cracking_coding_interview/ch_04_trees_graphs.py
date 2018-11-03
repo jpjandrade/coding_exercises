@@ -119,21 +119,6 @@ t = generate_random_tree(3, 0)
 g = generate_random_graph(5)
 
 
-def max_with_none(*arr):
-    filtered_arr = [elem for elem in arr if elem is not None]
-    return max(filtered_arr)
-
-
-def max_of_tree(t):
-    if t is None:
-        return None
-    return max_with_none(t.data, max_of_tree(t.left), max_of_tree(t.right))
-
-
-def check_if_bst(node):
-    return node.data >= max_of_tree(node.left) and node.data < max_of_tree(node.right)
-
-
 # ex 4.1
 # I will assume all nodes have distinct data so we are looking for a node with a certain data
 # this is easily extendable if we need to: we can have an node.name or node.index property
@@ -207,6 +192,9 @@ def create_minimal_tree_root(sorted_arr):
 # and I could get better performance by doing a linked list at that
 # level as well.
 
+# edit: after looking up the solution I totally overengineered this :-P
+# but I do believe it still runs at the same time and uses the same (big O) space
+# so I'll leave it as is
 
 def num_of_children(node):
     has_left = node.left is not None
@@ -246,3 +234,42 @@ def nodes_per_depth(node):
                 all_lists.append(None)
 
     return all_lists
+
+
+# ex 4.4
+# this is super not clean code because it's a function that does two things at once. But it runs
+# in O(n) so yay? Also if the implicit tuple expansion is a problem we can use dicts
+
+# edit: after looking at the solution, I prefer my tuple usage better than overloading the height variable :-)
+def balance_and_heigt(node):
+    if node is None:
+        return True, 0
+    left_balance, left_height = balance_and_heigt(node.left)
+    right_balance, right_height = balance_and_heigt(node.right)
+
+    balanced = left_balance and right_balance and abs(left_height - right_height) <= 1
+    height = 1 + max(left_height, right_height)
+    return balanced, height
+
+
+def is_balanced(node):
+    balanced, _ = balance_and_heigt(node)
+    return balanced
+
+# ex 4.5
+# had done this as an auxiliary function but moved here because turns out it was an exercise :-P
+
+
+def max_with_none(*arr):
+    filtered_arr = [elem for elem in arr if elem is not None]
+    return max(filtered_arr)
+
+
+def max_of_tree(t):
+    if t is None:
+        return None
+    return max_with_none(t.data, max_of_tree(t.left), max_of_tree(t.right))
+
+
+def check_if_bst(node):
+    return node.data >= max_of_tree(node.left) and node.data < max_of_tree(node.right)
