@@ -1,0 +1,1 @@
+This repo is mosly me reimplementing Java code (including solutions) from Cracking the Coding Interview, with the objective of learning a bit more of Java. Of all the useless folders is the whole repo, I'd say this is the most useless of them all :-P
