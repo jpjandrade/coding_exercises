@@ -119,6 +119,17 @@ t = generate_random_tree(3, 0)
 g = generate_random_graph(5)
 
 
+def max_with_none(*arr):
+    filtered_arr = [elem for elem in arr if elem is not None]
+    return max(filtered_arr)
+
+
+def max_of_tree(t):
+    if t is None:
+        return None
+    return max_with_none(t.data, max_of_tree(t.left), max_of_tree(t.right))
+
+
 # ex 4.1
 # I will assume all nodes have distinct data so we are looking for a node with a certain data
 # this is easily extendable if we need to: we can have an node.name or node.index property
@@ -257,19 +268,47 @@ def is_balanced(node):
     return balanced
 
 # ex 4.5
-# had done this as an auxiliary function but moved here because turns out it was an exercise :-P
+# totally got this wrong after reading solution :-(. Rewrote the book's solution in python only
 
 
-def max_with_none(*arr):
-    filtered_arr = [elem for elem in arr if elem is not None]
-    return max(filtered_arr)
-
-
-def max_of_tree(t):
-    if t is None:
-        return None
-    return max_with_none(t.data, max_of_tree(t.left), max_of_tree(t.right))
+def check_if_node_between_min_max(node, curr_min, curr_max):
+    if node is None:
+        return True
+    if (curr_min is not None and node.data <= curr_min) or (curr_max is not None and node.data > curr_max):
+        return False
+    if not check_if_node_between_min_max(node.left, curr_min, node.data) or not check_if_node_between_min_max(node.right, node.data, curr_max):
+        return False
+    return True
 
 
 def check_if_bst(node):
-    return node.data >= max_of_tree(node.left) and node.data < max_of_tree(node.right)
+    return check_if_node_between_min_max(node, None, None)
+
+
+# ex 4.6
+# I did this one a bit different by checking the parents values explicitely. I believe end result is the same
+def find_min_of_bst(node):
+    if node is None or node.left is None:
+        return node
+    else:
+        return find_min_of_bst(node.left)
+
+
+def find_first_larger_parent(node, d):
+    n = node
+    while n.parent is not None:
+        n = n.parent
+        if n.data >= d:
+            return n
+
+    raise EOFError
+
+
+def find_successor(node):
+    if node.right is not None:
+        return find_min_of_bst(node.right)
+    else:
+        try:
+            return find_first_larger_parent(node, node.data)
+        except EOFError:
+            return None
