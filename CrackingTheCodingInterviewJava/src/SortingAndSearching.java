@@ -1,4 +1,7 @@
+import java.io.FileNotFoundException;
+import java.io.FileReader;
 import java.util.Arrays;
+import java.util.Scanner;
 
 public class SortingAndSearching {
 
@@ -117,6 +120,49 @@ public class SortingAndSearching {
         }
     }
 
+
+    // ex 10.1
+
+    static void sortedMerge(int[] a, int[] b, int lastA, int lastB) {
+        int indexA = lastA - 1;
+        int indexB = lastB - 1;
+        int indexMerged = lastA + lastB - 1;
+
+        while (indexB >= 0) {
+            if (indexA >=0 && a[indexA] > b[indexB]) {
+                a[indexMerged] = a[indexA];
+                indexA--;
+            }
+            else {
+                a[indexMerged] = b[indexB];
+                indexB--;
+            }
+            indexMerged--;
+        }
+    }
+
+    // ex 10.7
+
+    private long numberOfInts = ((long) Integer.MAX_VALUE) + 1;
+    private byte[] bitfield = new byte [(int) (numberOfInts / 8)];
+
+    int findOpenNumber() throws FileNotFoundException {
+        String filename = "foo.txt";
+        Scanner in = new Scanner(new FileReader(filename));
+        while (in.hasNextInt()) {
+            int n = in.nextInt();
+            bitfield[n / 8] |= 1 << (n % 8);
+        }
+
+        for (int i = 0; i < bitfield.length; i++) {
+            for (int j = 0; j < 8; j++) {
+                if ((bitfield[i] & (i << j)) == 0) {
+                    return i * 8 + j;
+                }
+            }
+        }
+        return -1;
+    }
 
     public static void main(String[] args){
         int[] arr = new int[]{0, 4, 2, 3, 1, -2, 10, 3};
