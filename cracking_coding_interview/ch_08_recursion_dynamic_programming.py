@@ -17,6 +17,8 @@ def stairs_comb(n):
 
 # ex 8.2
 # this one was pretty fun to solve
+# edit: damn, totally missed the O(r ^{r + c}) -> O(rc) optimization :-(
+# edited to include it but jesus that one sucked to miss
 
 
 def generate_grid(r, c):
@@ -35,26 +37,29 @@ def robot_on_a_grid(grid):
     initial_x = 0
     initial_y = 0
     path = []
-    final_path, found = robot_search(initial_x, initial_y, path, grid)
+    failed_points = set()
+    final_path, found = robot_search(initial_x, initial_y, path, failed_points, grid)
     if found:
         return final_path
     else:
         return "No path found! :-("
 
 
-def robot_search(x, y, path, grid):
+def robot_search(x, y, path, failed_points, grid):
     G = grid['G']
-    if x >= grid['r'] or y >= grid['c'] or G[x][y] == -1:
+    is_visited = (x, y) in failed_points
+    if x >= grid['r'] or y >= grid['c'] or G[x][y] == -1 or is_visited:
         return path, False
 
     if G[x][y] == 1:
         return path, True
 
-    path_d, found_d = robot_search(x + 1, y, path + ['d'], grid)
+    failed_points_updated = failed_points.union({(x, y)})  # let's keep side effects to a minimal
+    path_d, found_d = robot_search(x + 1, y, path + ['d'], failed_points_updated, grid)
 
     if found_d:
         return path_d, True
 
-    path_r, found_r = robot_search(x, y + 1, path + ['r'], grid)
+    path_r, found_r = robot_search(x, y + 1, path + ['r'], failed_points_updated, grid)
 
     return path_r, found_r
