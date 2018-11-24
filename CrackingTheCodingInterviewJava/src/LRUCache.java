@@ -43,6 +43,25 @@ public class LRUCache {
         }
     }
 
+    public boolean removeKey(int key) {
+        LinkedListNode node = map.get(key);
+        removeFromLinkedList(node);
+        map.remove(key);
+        return true;
+    }
+
+    public void setKeyValue(int key, String value) {
+        removeKey(key);
+
+        if (map.size() >= maxCacheSize && tail != null) {
+            removeKey(tail.key);
+        }
+
+        LinkedListNode node = new LinkedListNode(key, value);
+        insertAtFrontOfList(node);
+        map.put(key, node);
+    }
+
     private static class LinkedListNode {
         private LinkedListNode next, prev;
         public int key;
