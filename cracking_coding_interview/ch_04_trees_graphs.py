@@ -281,8 +281,8 @@ def check_if_node_between_min_max(node, curr_min, curr_max):
     return True
 
 
-def check_if_bst(node):
-    return check_if_node_between_min_max(node, None, None)
+def check_if_bst(root):
+    return check_if_node_between_min_max(root, None, None)
 
 
 # ex 4.6
