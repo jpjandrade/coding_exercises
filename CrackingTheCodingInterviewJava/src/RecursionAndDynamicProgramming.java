@@ -41,6 +41,31 @@ public class RecursionAndDynamicProgramming {
         }
     }
 
+
+    // ex 8.4
+
+    private ArrayList<ArrayList<Integer>> getSubsets(ArrayList<Integer> set) {
+        ArrayList<ArrayList<Integer>> allsubsets = new ArrayList<>();
+
+        int max = 1 << set.size(); // 2^n
+        for (int k = 0; k < max; k++) {
+            ArrayList<Integer> subset = convertIntToSet(k, set);
+            allsubsets.add(subset);
+        }
+        return allsubsets;
+    }
+
+    private ArrayList<Integer> convertIntToSet(int x, ArrayList<Integer> set) {
+        ArrayList<Integer> subset = new ArrayList<>();
+        int index = 0;
+        for (int k = x; k > 0; k >>= 1) {
+            if ((k & 1) == 1) {
+                subset.add(set.get(index));
+            }
+            index++;
+        }
+        return subset;
+    }
     // ex 8.12
 
     static int GRID_SIZE = 8;
