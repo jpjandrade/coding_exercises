@@ -41,6 +41,30 @@ public class RecursionAndDynamicProgramming {
         }
     }
 
+    // ex 8.3
+    int magicFind(int[] array) {
+        return magicFind(array, 0, array.length - 1);
+    }
+
+    int magicFind(int[] array, int start, int end) {
+        if (end < start) return -1;
+
+        int midIndex = (start + end) / 2;
+        int midValue = array[midIndex];
+        if (midValue == midIndex) {
+            return midIndex;
+        }
+
+        int leftIndex = Math.min(midIndex - 1, midValue);
+        int left = magicFind(array, start, leftIndex);
+        if (left > 0) {
+            return left;
+        }
+
+        int rightIndex = Math.max(midIndex + 1, midValue);
+        int right = magicFind(array, rightIndex, end);
+        return right;
+    }
 
     // ex 8.4
 
