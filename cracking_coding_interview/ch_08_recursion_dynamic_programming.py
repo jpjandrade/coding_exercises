@@ -69,6 +69,7 @@ def robot_search(x, y, path, failed_points, grid):
 
 GRID_SIZE = 8
 
+
 def place_queens(row, current_column_positions, results):
     if row == GRID_SIZE:
         results.append(current_column_positions[:])  # slice is for copying
@@ -78,6 +79,7 @@ def place_queens(row, current_column_positions, results):
                 current_column_positions.append(col)
                 place_queens(row + 1, current_column_positions, results)
     return results
+
 
 def check_valid(row, candidate_col, curr_cols):
     for past_row in range(row):

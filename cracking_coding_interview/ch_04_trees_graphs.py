@@ -312,3 +312,56 @@ def find_successor(node):
             return find_first_larger_parent(node, node.data)
         except EOFError:
             return None
+
+
+# ex 4.8
+# so many corner cases this solution must be stupid
+
+def find_common_ancestor(root, node_a, node_b):
+    path_to_a = find_path_on_binary_tree(root, node_a, [])
+    path_to_b = find_path_on_binary_tree(root, node_b, [])
+    if path_to_a is None and path_to_b is None:
+        return None
+    if path_to_a is None:
+        return rebuild_path(path_to_b)
+    if path_to_b is None:
+        return rebuild_path(path_to_a)
+
+    divergence_idx = find_path_divergence(path_to_a, path_to_b)
+    ancestor = rebuild_path(root, path_to_a, divergence_idx)
+    return ancestor
+
+
+def find_path_on_binary_tree(node, t, curr_path):
+    if not node:
+        return None
+    if node.data == t:
+        return curr_path
+    left_path = find_path_on_binary_tree(node.left, t, curr_path + ['l'])
+    if left_path:
+        return left_path
+    return find_path_on_binary_tree(node.right, t, curr_path + ['r'])
+
+
+def find_path_divergence(path_a, path_b):
+    min_len = min(len(path_a), len(path_b))
+    if min_len == 0:
+        return 0
+    for i in range(min_len):
+        if path_a[i] != path_b[i]:
+            return i
+    return min_len
+
+
+def rebuild_path(root, path, idx):
+    if idx is None or idx < 0:
+        raise ValueError("No common path")
+    common_path = path[:idx]  # exclusive of idx
+    node = root
+    for direction in common_path:
+        if direction == 'r':
+            node = node.right
+        else:
+            node = node.left
+    return node
+

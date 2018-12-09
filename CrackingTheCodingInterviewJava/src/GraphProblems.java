@@ -108,4 +108,33 @@ public class GraphProblems {
         public ArrayList<Project> getChildren() { return children; }
         public int getNumberDepencies() { return dependencies; }
     }
+
+    // ex 4.8
+
+    BinaryNode commonAncestor(BinaryNode root, BinaryNode p, BinaryNode q) {
+        if (!covers(root, p) || !covers(root, q)) {
+            return null;
+        }
+        return ancestorHelper(root, p, q);
+    }
+
+    BinaryNode ancestorHelper(BinaryNode root, BinaryNode p, BinaryNode q) {
+        if (root == null || root == p || root == q) {
+            return root;
+        }
+
+        boolean pIsOnLeft = covers(root.left, p);
+        boolean qIsOnLeft = covers(root.left, q);
+        if (pIsOnLeft != qIsOnLeft) {
+            return root;
+        }
+        BinaryNode childSide = pIsOnLeft ? root.left : root.right;
+        return ancestorHelper(childSide, p, q);
+    }
+
+    boolean covers(BinaryNode root, BinaryNode p) {
+        if (root == null) return false;
+        if (root == p) return true;
+        return covers(root.left, p) || covers(root.right, p);
+    }
 }
