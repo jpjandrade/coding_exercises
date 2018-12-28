@@ -1,4 +1,5 @@
-import java.util.Random;
+import java.lang.reflect.Array;
+import java.util.*;
 
 
 public class HardProblems {
@@ -36,6 +37,66 @@ public class HardProblems {
         return subset;
     }
 
+    // ex 17.6
+
+    int count2sInRangeAtDigit(int number, int d) {
+        int powerOf10 = (int) Math.pow(10, d);
+        int nextPowerOf10 = powerOf10 * 10;
+        int right = number % powerOf10;
+
+        int roundDown = number - number % nextPowerOf10;
+        int roundUp = roundDown + nextPowerOf10;
+
+        int digit = (number / powerOf10) % 10;
+        if (digit < 2) {
+            return roundDown / 10;
+        } else if (digit == 2){
+            return roundDown / 10 + right + 1;
+        } else {
+            return roundUp / 10;
+        }
+    }
+
+    int count2sInRange(int number) {
+        int count = 0;
+        int len = String.valueOf(number).length();
+        for (int digit = 0; digit < len; digit++) {
+            count += count2sInRangeAtDigit(number, digit);
+        }
+        return count;
+    }
+
+    // ex 17.9
+
+    int getKthMagicNumber(int k) {
+        if (k < 0) {
+            return 0;
+        }
+        int val = 0;
+        Queue<Integer> queue3 = new Queue<>();
+        Queue<Integer> queue5 = new Queue<>();
+        Queue<Integer> queue7 = new Queue<>();
+        queue3.add(1);
+
+        for (int i = 0; i <= k; i++) {
+            int v3 = queue3.isEmpty() ? Integer.MAX_VALUE : queue3.peek();
+            int v5 = queue5.isEmpty() ? Integer.MAX_VALUE : queue5.peek();
+            int v7 = queue7.isEmpty() ? Integer.MAX_VALUE : queue7.peek();
+            val = Math.min(v3, Math.min(v5, v7));
+            if (val == v3) {
+                queue3.remove();
+                queue3.add(3 * val);
+                queue5.add(5 * val);
+            } else if (val == v5) {
+                queue5.remove();
+                queue5.add(5 * val);
+            } else if (val == v7) {
+                queue7.remove();
+            }
+            queue7.add(7 * val);
+        }
+        return val;
+    }
     // ex 17.21
 
     int computeHistogramVolume(int[] histo) {

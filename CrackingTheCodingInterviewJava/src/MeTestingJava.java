@@ -4,6 +4,7 @@ import java.util.Set;
 
 public class MeTestingJava {
 
+    // is java pass by value or pass by reference (ans: pass by reference, arr is modified here)
     private static void foo(int[] arr) {
         for(int k=0; k < arr.length; k++) {
             if(k % 2 == 0) {
@@ -12,6 +13,30 @@ public class MeTestingJava {
         }
     }
 
+    // quickselect attempt
+    public static int quickselect(int[] arr, int k) {
+        return quickselect(arr, 0, arr.length - 1, k);
+    }
+
+    private static int quickselect(int[] arr, int left, int right, int k) {
+        if (left == right) {
+            return arr[left];
+        }
+        int index = SortingAndSearching.partition(arr, left, right);
+        if (index == k) {
+            return arr[k];
+        }
+        if (left < index - 1) {
+            return quickselect(arr, left, index - 1, k);
+        }
+
+        return quickselect(arr, index, right, k);
+
+    }
+
+
+
+    // leetcode exercise
     public static int findMaximumXOR(int[] nums) {
         int max = 0, mask = 0;
         for(int i = 31; i >= 0; i--){
@@ -41,8 +66,10 @@ public class MeTestingJava {
         foo(a);
         System.out.println(Arrays.toString(a));
 
-        int[] nums = new int[]{2, 3, 6, 10, 25};
-        int r = findMaximumXOR(nums);
-        System.out.println(r);
+        // int[] nums = new int[]{2, 3, 6, 10, 25};
+        // int r = findMaximumXOR(nums);
+        // System.out.println(r);
+        int [] arr = new int[] {0, -1, 4, 2, 10, 5};
+        System.out.println(quickselect(arr, 0));
     }
 }

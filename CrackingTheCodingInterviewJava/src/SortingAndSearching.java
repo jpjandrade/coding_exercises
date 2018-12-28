@@ -1,5 +1,6 @@
 import java.io.FileNotFoundException;
 import java.io.FileReader;
+import java.lang.reflect.Array;
 import java.util.Arrays;
 import java.util.Scanner;
 
@@ -61,7 +62,7 @@ public class SortingAndSearching {
         }
     }
 
-    private static int partition(int[] arr, int left, int right) {
+    public static int partition(int[] arr, int left, int right) {
         int pivot = arr[(left + right) / 2];
         while (left <= right) {
             while (arr[left] < pivot) left++;
@@ -77,7 +78,7 @@ public class SortingAndSearching {
         return left;
     }
 
-    private static void swap(int[] arr, int left, int right) {
+    public static void swap(int[] arr, int left, int right) {
         int temp = arr[left];
         arr[left] = arr[right];
         arr[right] = temp;
@@ -164,6 +165,32 @@ public class SortingAndSearching {
         return -1;
     }
 
+    // ex 10.11
+
+    public static void sortValleyPeak(int[] array) {
+        for (int i = 1; i < array.length; i += 2) {
+            int biggestIndex = maxIndex(array, i - 1, i, i + 1);
+            if (i != biggestIndex) {
+                swap(array, i, biggestIndex);
+            }
+        }
+    }
+
+    static int maxIndex(int[] array, int a, int b, int c) {
+        int aValue = getIfOnArray(array, a);
+        int bValue = getIfOnArray(array, b);
+        int cValue = getIfOnArray(array, c);
+        int max = Math.max(aValue, Math.max(bValue, cValue));
+        if (aValue == max) return a;
+        else if (bValue == max) return b;
+        else return c;
+    }
+
+    static int getIfOnArray(int[] array, int i) {
+        int val = i >= 0 && i < array.length ? array[i] : Integer.MIN_VALUE;
+        return val;
+    }
+
     public static void main(String[] args){
         int[] arr = new int[]{0, 4, 2, 3, 1, -2, 10, 3};
         System.out.println(Arrays.toString(arr));
@@ -177,6 +204,8 @@ public class SortingAndSearching {
         int indexOf4 = binarySearch(arr2, 4);
         System.out.println(indexOf4);
 
+        sortValleyPeak(arr2);
+        System.out.println(Arrays.toString(arr2));
 
 
     }
