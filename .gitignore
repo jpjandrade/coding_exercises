@@ -8,3 +8,5 @@ project/
 *.txt
 *.hdf5
 .DS_Store
+.vscode
+*.dSYM
