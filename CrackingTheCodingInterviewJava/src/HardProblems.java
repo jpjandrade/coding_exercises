@@ -121,4 +121,44 @@ public class HardProblems {
 
         return sum;
     }
+
+    // leetcode 4, from https://www.youtube.com/watch?v=LPFhl65R7ww
+    double medianOfSortedArrays(int[] arr1, int[] arr2) {
+        if (arr1.length > arr2.length) {
+            return medianOfSortedArrays(arr2, arr1);
+        }
+
+        int n = arr1.length;
+        int m = arr2.length;
+
+        int low = 0;
+        int high = n;
+
+        while (low <= high) {
+            int i = (low + high) / 2;
+            int j = (n + m + 1) / 2 - i;
+
+            int maxLeft1 = (i == 0) ? Integer.MIN_VALUE : arr1[i - 1];
+            int minRight1 = (i == n) ? Integer.MAX_VALUE : arr1[i];
+
+            int maxLeft2 = (j == 0) ? Integer.MIN_VALUE : arr2[j - 1];
+            int minRight2 = (j == m) ? Integer.MAX_VALUE : arr2[j];
+
+            if (maxLeft1 <= minRight2 && maxLeft2 <= minRight1) {
+                if ((n + m) % 2 == 0){
+                    double median = (Math.max(maxLeft1, maxLeft2) + Math.min(minRight1, minRight2)) / 2.0;
+                    return median;
+                } else {
+                    return (double)Math.max(maxLeft1, maxLeft2);
+                }
+
+            } else if (maxLeft1 > minRight2) {
+                high = i - 1;
+            } else {
+                low = i + 1;
+            }
+        }
+
+        throw new IllegalArgumentException("Lists not ordered!");
+    }
 }
