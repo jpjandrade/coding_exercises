@@ -18,7 +18,7 @@ int gcd(int a, int b) {
 
   return a;
 }
-int main () {
+int main() {
   int a, b, res;
   cout << "Please type a and b" << endl;
   cin >> a;

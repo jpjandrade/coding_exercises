@@ -16,8 +16,7 @@ int main() {
       cout << "You entered a non-numeric. Please enter a number only!" << endl;
       cin.clear();
       cin.ignore(100, '\n');
-    }
-    else if (input_var != -1) {
+    } else if (input_var != -1) {
       cout << "You entered " << input_var << endl;
     }
   } while (input_var != -1);

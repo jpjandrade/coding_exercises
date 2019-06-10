@@ -1,8 +1,8 @@
-#include <iostream>
 #include <ctime>
+#include <iostream>
 using namespace std;
 
-int get_random_num() { 
+int get_random_num() {
   int k = rand() % 100 + 1;
   return k;
 }
@@ -10,7 +10,7 @@ int get_random_num() {
 int process_guess() {
   int guess;
   cout << "Please type a your guess between 1 and 100 (negative numbers to terminate)" << endl;
-  while(!(cin >> guess)) {
+  while (!(cin >> guess)) {
     cout << "Please type a numeric value" << endl;
     cin.clear();
     cin.ignore(100, '\n');
@@ -24,15 +24,13 @@ bool parse_guess(int guess, int target) {
   }
   if (guess < -1 || guess == 0 || guess > 100) {
     cout << "Please type a number between 1 and 100!" << endl;
-  }
-  else if (guess < target) {
+  } else if (guess < target) {
     cout << "Too low!" << endl;
-  }
-  else {
+  } else {
     cout << "Too high!" << endl;
   }
 
-  return false; 
+  return false;
 }
 int main() {
   srand(time(NULL));
@@ -42,7 +40,7 @@ int main() {
   bool done = false;
   int guess;
   int attempts = 0;
-  while (!done){
+  while (!done) {
     guess = process_guess();
     done = parse_guess(guess, k);
     attempts++;
@@ -52,10 +50,8 @@ int main() {
     cout << "*** NICE! You got it! ***" << endl;
     cout << "Number was " << k << endl;
     cout << "Attemtps: " << attempts << endl;
-  }
-  else {
+  } else {
     cout << "Terminating..." << endl;
   }
   return 0;
-
 }

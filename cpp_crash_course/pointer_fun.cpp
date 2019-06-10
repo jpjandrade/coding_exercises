@@ -12,7 +12,7 @@ int main() {
   *foo = *goo + 3;
   foo = goo;
   *goo = 5;
-  *foo = *goo + *foo; // foo and goo point to 10
+  *foo = *goo + *foo;  // foo and goo point to 10
   DoIt(*foo, *goo);
   cout << (*foo) << endl;
 }
@@ -22,4 +22,4 @@ void DoIt(int &foo, int goo) {
   goo = foo + 4;
   foo = goo + 3;
   goo = foo;
-} 
+}

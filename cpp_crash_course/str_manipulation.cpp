@@ -9,6 +9,6 @@ int main() {
   str1.replace(str1.find("to be", 0), 5, "to jump");
   str1.erase(9, 4);
   cout << str1 << endl;
-  for (int i = 0; i < str3.length(); i++)
-    cout << str3[i]; cout << endl;
+  for (int i = 0; i < str3.length(); i++) cout << str3[i];
+  cout << endl;
 }
