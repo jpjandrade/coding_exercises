@@ -7,6 +7,7 @@ project/
 *.sbt
 *.txt
 *.hdf5
+*.out
 .DS_Store
 .vscode
 *.dSYM
