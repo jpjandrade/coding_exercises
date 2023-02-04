@@ -2,7 +2,7 @@ import java.util.NoSuchElementException;
 
 public class Queue<T> {
     private static class QueueNode<T> {
-        private T data;
+        private final T data;
         private QueueNode<T> next;
 
         public QueueNode(T data){

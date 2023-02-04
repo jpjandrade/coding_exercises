@@ -1,22 +1,22 @@
-public class ListNode {
-    ListNode next = null;
-    int data;
+public class ListNode <T> {
+    ListNode<T> next = null;
+    T data;
 
-    public ListNode(int d) {
+    public ListNode(T d) {
         data = d;
     }
 
-    void appendToTail(int d) {
-        ListNode end = new ListNode(d);
-        ListNode n = this;
+    public void appendToTail(T d) {
+        ListNode<T> end = new ListNode<T>(d);
+        ListNode<T> n = this;
         while (n.next != null) {
             n = n.next;
         }
         n.next = end;
     }
 
-    ListNode deleteNode(ListNode head, int d){
-        ListNode n = head;
+    public ListNode<T> deleteNode(ListNode<T> head, T d){
+        ListNode<T> n = head;
 
         if (n.data == d) {
             return head.next;
@@ -31,5 +31,16 @@ public class ListNode {
         }
 
         return head;
+    }
+
+    public void print() {
+        ListNode<T> n = this;
+        System.out.print(this.data);
+        while (n.next != null) {
+            System.out.print(" -> ");
+            System.out.print(n.next.data);
+            n = n.next;
+        }
+        System.out.print("\n");
     }
 }
