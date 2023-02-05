@@ -1,3 +1,5 @@
+import java.util.LinkedList;
+
 public class Sorting {
     public static <T extends Comparable<T>> void heapSort(T[] arr) {
         Heap<T> h = new Heap<T>(arr);
@@ -16,12 +18,37 @@ public class Sorting {
         }
         int middle = (low + high) / 2;
         mergeSort(arr, low, middle);
-        mergeSort(arr, middle, high);
+        mergeSort(arr, middle + 1, high);
         merge(arr, low, middle, high);
     }
 
     private static <T extends Comparable<T>> void merge(T[] arr, int low, int middle, int high) {
-        throw new java.lang.UnsupportedOperationException("Not implemented yet!");
+        LinkedList<T> buffer1 = new LinkedList<T>();
+        LinkedList<T> buffer2 = new LinkedList<T>();
+
+        for(int i = low; i<=middle; i++) buffer1.add(arr[i]);
+        for(int i = middle + 1; i<= high; i++) buffer2.add(arr[i]);
+
+        int i = low;
+        while (!(buffer1.isEmpty() || buffer2.isEmpty())) {
+            if (buffer1.peek().compareTo(buffer2.peek()) <= 0) {
+                arr[i] = buffer1.pop();
+            } else{
+                arr[i] = buffer2.pop();
+            }
+            i++;
+        }
+
+        while(!buffer1.isEmpty()) {
+            arr[i] = buffer1.pop();
+            i++;
+        }
+
+        while(!buffer2.isEmpty()) {
+            arr[i] = buffer2.pop();
+            i++;
+        }
+
     }
 
     public static <T extends Comparable<T>> void insertionSort(T[] arr) {

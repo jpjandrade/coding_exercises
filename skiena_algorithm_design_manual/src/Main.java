@@ -11,5 +11,9 @@ public class Main {
         Integer[] insertArr = Arrays.copyOf(arr, arr.length);
         Sorting.insertionSort(insertArr);
         System.out.println(Arrays.toString(insertArr));
+
+        Integer[] mergeArr = Arrays.copyOf(arr, arr.length);
+        Sorting.mergeSort(mergeArr);
+        System.out.println(Arrays.toString(mergeArr));
     }
 }
