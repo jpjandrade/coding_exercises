@@ -1,8 +1,11 @@
 import java.io.FileNotFoundException;
 import java.io.FileReader;
-import java.lang.reflect.Array;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Objects;
 import java.util.Scanner;
+
+import static java.lang.Math.abs;
 
 public class SortingAndSearching {
 
@@ -22,19 +25,18 @@ public class SortingAndSearching {
     }
 
     private static void merge(int[] array, int[] helper, int low, int middle, int high) {
-        for(int i = low; i <= high; i++) {
+        for (int i = low; i <= high; i++) {
             helper[i] = array[i];
         }
         int helperLeft = low;
         int helperRight = middle + 1;
         int current = low;
 
-        while(helperLeft <= middle && helperRight <= high) {
+        while (helperLeft <= middle && helperRight <= high) {
             if (helper[helperLeft] <= helper[helperRight]) {
                 array[current] = helper[helperLeft];
                 helperLeft++;
-            }
-            else {
+            } else {
                 array[current] = helper[helperRight];
                 helperRight++;
             }
@@ -96,7 +98,7 @@ public class SortingAndSearching {
             mid = (low + high) / 2;
             if (a[mid] < x) {
                 low = mid + 1;
-            } else if (a[mid] > x){
+            } else if (a[mid] > x) {
                 high = mid - 1;
             } else {
                 return mid;
@@ -112,11 +114,9 @@ public class SortingAndSearching {
         int mid = (low + high) / 2;
         if (a[mid] > x) {
             return binarySearchRecursive(a, x, mid + 1, high);
-        }
-        else if (a[mid] < x) {
+        } else if (a[mid] < x) {
             return binarySearchRecursive(a, x, low, mid - 1);
-        }
-        else {
+        } else {
             return mid;
         }
     }
@@ -130,11 +130,10 @@ public class SortingAndSearching {
         int indexMerged = lastA + lastB - 1;
 
         while (indexB >= 0) {
-            if (indexA >=0 && a[indexA] > b[indexB]) {
+            if (indexA >= 0 && a[indexA] > b[indexB]) {
                 a[indexMerged] = a[indexA];
                 indexA--;
-            }
-            else {
+            } else {
                 a[indexMerged] = b[indexB];
                 indexB--;
             }
@@ -145,7 +144,7 @@ public class SortingAndSearching {
     // ex 10.7
 
     private long numberOfInts = ((long) Integer.MAX_VALUE) + 1;
-    private byte[] bitfield = new byte [(int) (numberOfInts / 8)];
+    private byte[] bitfield = new byte[(int) (numberOfInts / 8)];
 
     int findOpenNumber() throws FileNotFoundException {
         String filename = "foo.txt";
@@ -191,7 +190,7 @@ public class SortingAndSearching {
         return val;
     }
 
-    public static void main(String[] args){
+    public static void main(String[] args) {
         int[] arr = new int[]{0, 4, 2, 3, 1, -2, 10, 3};
         System.out.println(Arrays.toString(arr));
         mergesort(arr);
@@ -201,6 +200,19 @@ public class SortingAndSearching {
         quicksort(arr2);
         System.out.println(Arrays.toString(arr));
 
+        System.out.println("Ex 10.5");
+        System.out.println("Helper method");
+        Integer[] arrClosest = new Integer[]{0, 4, 5, 10, 11, 12};
+        System.out.println(Arrays.toString(arrClosest));
+        System.out.println(findClosestValue(1, arrClosest));
+        System.out.println(findClosestValue(6, arrClosest));
+        System.out.println(findClosestValue(10, arrClosest));
+        System.out.println(findClosestValue(14, arrClosest));
+        System.out.println("finding: ");
+        String[] sparse = new String[]{"at", "", "", "", "", "ball", "", "car", "", "", "", "dad", "", "", ""};
+        System.out.println(sparseSearch("ball", sparse));
+
+
         int indexOf4 = binarySearch(arr2, 4);
         System.out.println(indexOf4);
 
@@ -209,7 +221,6 @@ public class SortingAndSearching {
 
 
     }
-
 
 
 }

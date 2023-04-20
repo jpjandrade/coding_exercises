@@ -41,6 +41,27 @@ public class RecursionAndDynamicProgramming {
         }
     }
 
+    public static int countWaysDP(int n) {
+        if (n <= 0) {
+            return 1;
+        }
+        int[] dp = new int[n];
+        for (int i = 0; i < n; i++) {
+            dp[i] = 0;
+        }
+        dp[0] = 1;
+        if (n > 1) dp[1] = 2;
+        if (n > 2) dp[2] = 2 + 1 + 1;
+        for (int i = 3; i < n; i ++) {
+            dp[i] = dp[i - 3] + dp[i - 2] + dp[i - 1];
+        }
+        return dp[n - 1];
+    }
+
+
+    // ex 8.2
+//    public static char[] robotOnGrid() { return;}
+
     // ex 8.3
     int magicFind(int[] array) {
         return magicFind(array, 0, array.length - 1);
@@ -69,14 +90,14 @@ public class RecursionAndDynamicProgramming {
     // ex 8.4
 
     private ArrayList<ArrayList<Integer>> getSubsets(ArrayList<Integer> set) {
-        ArrayList<ArrayList<Integer>> allsubsets = new ArrayList<>();
+        ArrayList<ArrayList<Integer>> allSubsets = new ArrayList<>();
 
         int max = 1 << set.size(); // 2^n
         for (int k = 0; k < max; k++) {
             ArrayList<Integer> subset = convertIntToSet(k, set);
-            allsubsets.add(subset);
+            allSubsets.add(subset);
         }
-        return allsubsets;
+        return allSubsets;
     }
 
     private ArrayList<Integer> convertIntToSet(int x, ArrayList<Integer> set) {
@@ -135,10 +156,14 @@ public class RecursionAndDynamicProgramming {
         for (int k=0; k < 10; k++) {
             System.out.print(countWays(k) + " ");
         }
-        System.out.println("\nEx 8.12");
+        System.out.println();
+        for (int k=0; k < 10; k++) {
+            System.out.print(countWaysDP(k) + " ");
+        }
 
+        System.out.println("\nEx 8.12");
         Integer[] columns = new Integer[GRID_SIZE];
-        ArrayList<Integer[]> results = new ArrayList<Integer[]>();
+        ArrayList<Integer[]> results = new ArrayList<>();
         placeQueens(0, columns, results);
         System.out.println("\nQueen's positions");
         System.out.println(Arrays.toString(results.get(0)));
