@@ -21,6 +21,7 @@ class Solution {
       for (const auto& c : words.at(i)) {
         curr_word[c]++;
       }
+
       for (const auto& [c, count] : common_chars) {
         if (curr_word[c] < common_chars[c]) {
           common_chars[c] = curr_word[c];
@@ -37,3 +38,14 @@ class Solution {
     return res;
   }
 };
+
+int main() {
+  vector<string> words = {"hello", "helicopter", "horizon"};
+  Solution sol;
+  vector<string> res = sol.commonChars(words);
+  for (const string& s : res) {
+    std::cout << s << std::endl;
+  }
+
+  std::cout << std::endl;
+}
