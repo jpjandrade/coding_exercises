@@ -1,13 +1,8 @@
 #include <iostream>
-#include <set>
 #include <sstream>
 #include <string>
-#include <unordered_map>
-#include <unordered_set>
 #include <vector>
 
-// Mostly copied from editorial with some changes on my side to learn Tries in
-// C++.
 class TrieNode {
  public:
   bool is_end;
@@ -18,10 +13,10 @@ class Trie {
  public:
   Trie() : root_(std::make_unique<TrieNode>()) {}
 
-  void insert(const std::string& word) {
-    TrieNode* current = root_.get();
+  void insert(const std::string &word) {
+    TrieNode *current = root_.get();
 
-    for (const char& c : word) {
+    for (const char &c : word) {
       int index = c - 'a';
       if (current->children[index] == nullptr) {
         current->children[index] = std::make_unique<TrieNode>();
@@ -32,10 +27,10 @@ class Trie {
     current->is_end = true;
   }
 
-  std::string shortest_root(const std::string& word) {
-    TrieNode* current = root_.get();
+  std::string shortest_root(const std::string &word) {
+    TrieNode *current = root_.get();
     for (int i = 0; i < word.size(); ++i) {
-      const char& c = word[i];
+      const char &c = word[i];
       if (current->children[c - 'a'] == nullptr) {
         // Couldn't find a stem in the dict.
         return word;
@@ -57,7 +52,7 @@ class Trie {
 // Copied from the editorial to learn tries in C++.
 class Solution {
  public:
-  std::string replaceWords(std::vector<std::string>& dictionary,
+  std::string replaceWords(std::vector<std::string> &dictionary,
                            std::string sentence) {
     Trie trie = build_trie(dictionary);
 
@@ -77,7 +72,7 @@ class Solution {
  private:
   Trie build_trie(std::vector<std::string> dictionary) {
     Trie trie;
-    for (const std::string& word : dictionary) {
+    for (const std::string &word : dictionary) {
       trie.insert(word);
     }
     return trie;
