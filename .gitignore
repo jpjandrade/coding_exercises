@@ -12,3 +12,4 @@ project/
 .vscode
 *.dSYM
 *.pt
+.ipynb_checkpoints
