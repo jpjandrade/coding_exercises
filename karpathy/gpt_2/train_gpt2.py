@@ -1,5 +1,7 @@
 from dataclasses import dataclass
 import math
+import sys
+
 import tiktoken
 import torch
 import torch.nn as nn
@@ -24,12 +26,12 @@ GPT2_CONFIG_ARGS = {
 }
 
 
+# Default parameters are equal to the GPT2 config above.
 @dataclass
 class GPTConfig:
     block_size: int = 1024  # max seq length
-    vocab_size: int = (
-        50257  # number of tokens: 50k BPE merges + 256 bytes tokens + 1 <|endoftext|> tokens.
-    )
+    # number of tokens: 50k BPE merges + 256 bytes tokens + 1 <|endoftext|> tokens.
+    vocab_size: int = 50257
     n_layer: int = 12  # number of attn layers
     n_head: int = 12  # number of heads
     n_embed: int = 768  # embedding dimension
@@ -43,6 +45,7 @@ class CausalSelfAttention(nn.Module):
         self.c_attn = nn.Linear(config.n_embed, 3 * config.n_embed)
         # Output projection.
         self.c_proj = nn.Linear(config.n_embed, config.n_embed)
+        self.c_proj.NANOGPT_SCALE_INIT = 1
 
         self.n_head = config.n_head
         self.n_embed = config.n_embed
@@ -156,7 +159,24 @@ class GPT(nn.Module):
         # Project back from n_embed (i.e. embedding dimensions) to the vocab_size (i.e., the tokens).
         self.lm_head = nn.Linear(config.n_embed, config.vocab_size, bias=False)
 
-    def forward(self, idx):
+        # weight sharing from lm_head and wte, per the GPT2 paper.
+        self.transformer.wte.weight = self.lm_head.weight
+
+        self.apply(self._init_weights)
+
+    def _init_weights(self, module):
+        if isinstance(module, nn.Linear):
+            weight_std = 0.02
+            if hasattr(module, "NANOGPT_SCALE_INIT"):
+                # Every layer should contribute two sums of the residual path.
+                weight_std /= math.sqrt(2 * self.config.n_layer)
+            torch.nn.init.normal_(module.weight, mean=0.0, std=weight_std)
+            if module.bias is not None:
+                torch.nn.init.zeros_(module.bias)
+        elif isinstance(module, nn.Embedding):
+            torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
+
+    def forward(self, idx, targets=None):
         # idx is [B, T] (like, literally the entry sentences in token format)
         B, T = idx.size()
         assert T <= self.config.block_size
@@ -180,7 +200,15 @@ class GPT(nn.Module):
         # It's a bit silly, we'll get there.
         logits = self.lm_head(x)
 
-        return logits
+        loss = None
+        if targets is not None:
+            # Cross entropy takes (among others) a bidimensional tensor of (N, C) for inputs,
+            # where N is the "batch size" and C is the number of classes (vocab_size for us).
+            # We're using a fancy B * T for number of examples, so we need to flatten to (B * T, vocab_size).
+            # The targets are a B, T tensor, which we completely flatten.
+            loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1))
+
+        return logits, loss
 
     @classmethod
     def from_pretrained(cls, model_type):
@@ -244,13 +272,45 @@ class GPT(nn.Module):
         return model
 
 
+class DataLoaderLite:
+    def __init__(self, B, T):
+        self.B = B
+        self.T = T
+
+        with open("input.txt", "r") as f:
+            text = f.read()
+        enc = tiktoken.get_encoding("gpt2")
+        tokens = enc.encode(text)
+        self.tokens = torch.tensor(tokens)
+        print(f"loaded {len(self.tokens)} tokens")
+        print(f"1 epoch = {len(self.tokens) // (B * T)} batches / steps")
+
+        self.current_position = 0
+
+    def next_batch(self):
+        B, T = self.B, self.T
+        buf = self.tokens[self.current_position : self.current_position + B * T + 1]
+        x = buf[:-1].view(B, T)
+        y = buf[1:].view(B, T)
+
+        self.current_position += B * T
+
+        # If the next batch would go OOB, reset.
+        if self.current_position + (B * T + 1) > len(self.tokens):
+            self.current_position = 0
+
+        return x, y
+
+
 num_return_sequences = 5
 max_length = 30
 
-model = GPT.from_pretrained("gpt2")
-# Uncomment this to load from hugging face directly to test correctness.
-# (And take the first element of logits below)
+
+# Uncomment this to load either from pretrained weights or from hugging face directly (to test correctness).
+# model = GPT.from_pretrained("gpt2")
 # model = GPT2LMHeadModel.from_pretrained("gpt2")
+
+model = GPT(GPTConfig())
 
 # Put model in evaluation mode. Normally means we disable dropout, batchnorm and etc.
 model.eval()
@@ -258,8 +318,35 @@ model.eval()
 # Set device in the top, could be whatever you want.
 model.to(device)
 
+B, T = 32, 128
+data = DataLoaderLite(B, T)
+
+
+# AdamW is a "bug fix" of Adam, where weight decay is applied directly to the weights.
+optimizer = torch.optim.AdamW(model.parameters(), lr=3e-4)
+n_steps = 100
+for i in range(n_steps):
+    optimizer.zero_grad()
+    x, y = data.next_batch()
+    logits, loss = model(x.to(device), y.to(device))
+
+    # Always acumulates the gradients, doesn't reset by defaul.
+    # This is why we need to zero_grad first.
+    loss.backward()
+    optimizer.step()
+
+    # Loss is a one-dimensional tensor which lives on the device.
+    # .item() converts it into a float and ships it to the CPU for printing.
+    print(f"step {i}, loss: {loss.item()}")
+
+# sys.exit(0)
+torch.manual_seed(1337)
+torch.mps.manual_seed(1337)
+
+# Send a query to our amazing GPT2.
 enc = tiktoken.get_encoding("gpt2")
-tokens = enc.encode("Hello, I'm a language model,")
+query = "Hello, I'm a language model,"
+tokens = enc.encode(query)
 print("Tokens: ", tokens)
 tokens = torch.tensor(tokens, dtype=torch.long)
 
@@ -267,13 +354,9 @@ tokens = tokens.unsqueeze(0).repeat(num_return_sequences, 1)
 
 x = tokens.to(device)
 model.forward(x)
-
-torch.manual_seed(42)
-torch.mps.manual_seed(42)
-
 while x.size(1) < max_length:
     with torch.no_grad():
-        logits = model(x)  # (B, T, vocab_size)
+        logits, loss = model(x)  # (B, T, vocab_size)
         # Throw away all the other logits, we only care about the last location.
         # (because we're predicting T + 1).
         # This is wasteful of course, but we're not exactly OpenAI / Deepmind here.
