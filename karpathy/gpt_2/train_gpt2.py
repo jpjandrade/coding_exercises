@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 import math
-import sys
+import time
 
 import tiktoken
 import torch
@@ -65,11 +65,11 @@ class CausalSelfAttention(nn.Module):
 
         qkv = self.c_attn(x)
 
-        # This is how we do effectively, we just split now.
+        # This is how we do efficiently, we just split now.
         q, k, v = qkv.split(self.n_embed, dim=2)
 
         # All tensors are (B, nh, T, hs), because nh * hs = C, this is just a reshape.
-        # These are just n_head parallel attention modules which happen in parallel.
+        # These are just n_head attention modules which happen in parallel.
         # They are in the same tensor for effiency.
 
         k = k.view(B, T, self.n_head, C // self.n_head).transpose(
@@ -301,6 +301,9 @@ class DataLoaderLite:
 
         return x, y
 
+    def get_steps_per_epoch(self):
+        return len(self.tokens) // (B * T)
+
 
 num_return_sequences = 5
 max_length = 30
@@ -310,6 +313,7 @@ max_length = 30
 # model = GPT.from_pretrained("gpt2")
 # model = GPT2LMHeadModel.from_pretrained("gpt2")
 
+torch.set_float32_matmul_precision('medium')
 model = GPT(GPTConfig())
 
 # Put model in evaluation mode. Normally means we disable dropout, batchnorm and etc.
@@ -317,15 +321,20 @@ model.eval()
 
 # Set device in the top, could be whatever you want.
 model.to(device)
-
-B, T = 32, 128
+model = torch.compile(model, backend="aot_eager")
+# Batch size of 8GB to run on my 32gb MBP.
+B, T = 8, 1024
 data = DataLoaderLite(B, T)
 
 
 # AdamW is a "bug fix" of Adam, where weight decay is applied directly to the weights.
 optimizer = torch.optim.AdamW(model.parameters(), lr=3e-4)
-n_steps = 100
+
+n_epochs = 5
+n_steps = n_epochs * data.get_steps_per_epoch()
+print(f"Running {n_steps} steps:")
 for i in range(n_steps):
+    t0 = time.time()
     optimizer.zero_grad()
     x, y = data.next_batch()
     logits, loss = model(x.to(device), y.to(device))
@@ -334,10 +343,13 @@ for i in range(n_steps):
     # This is why we need to zero_grad first.
     loss.backward()
     optimizer.step()
-
+    torch.mps.synchronize()
+    t1 = time.time()
+    dt = (t1 - t0) * 1000  # time in ms
+    tokens_per_second = (data.B * data.T) / (t1 - t0)
     # Loss is a one-dimensional tensor which lives on the device.
     # .item() converts it into a float and ships it to the CPU for printing.
-    print(f"step {i}, loss: {loss.item()}")
+    print(f"step {i}, loss: {loss.item()}, dt: {dt:.2f}ms, tok/sec: {tokens_per_second:.2f}")
 
 # sys.exit(0)
 torch.manual_seed(1337)
