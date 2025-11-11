@@ -31,7 +31,7 @@ def get_policy_action_distribution(model, observations):
     Get the action probability distribution from the policy model.
 
     Args:
-        model: Policy neural network.
+        model: Policy neural network that outputs action logits.
         observations: Tensor with the environment observations.
 
     Returns:
@@ -46,7 +46,7 @@ def sample_action(model, observations):
     Sample an action from the policy model given observations.
 
     Args:
-        model: Policy neural network.
+        model: Policy neural network that outputs action logits.
         observations: Tensor of environment observations.
 
     Returns:
@@ -55,43 +55,32 @@ def sample_action(model, observations):
     return get_policy_action_distribution(model, observations).sample().item()
 
 
-def compute_loss(observations, actions, returns, policy_model):
+def compute_loss(observations, actions, returns, values, policy_model):
     """
-    Vanilla (REINFORCE) policy gradient loss with mean-normalized returns.
+    Actor-Critic policy gradient loss using advantages.
 
-    Computes the policy gradient loss by weighting action log-probabilities
-    with mean-normalized returns. The mean normalization reduces variance
-    without introducing bias.
+    Computes the policy loss by weighting log-probabilities with advantages
+    (returns - value baseline). The value estimates are detached to prevent
+    gradients from flowing back through the critic.
 
     Args:
         observations: Tensor of environment observations.
         actions: Tensor of actions taken.
-        returns: Tensor of returns (reward-to-go).
-        policy_model: Policy neural network.
+        returns: Tensor of returns (reward-to-go or normalized returns).
+        values: Tensor of value function estimates V(s).
+        policy_model: Policy neural network (the actor).
 
     Returns:
         Tensor: The policy gradient loss.
     """
-    # Mean normalization to reduce variance.
-    returns_normalized = returns - returns.mean()
+    # Calculate advantage by subtracting value function from returns.
+    advantages = returns - values.detach()
     logp = get_policy_action_distribution(policy_model, observations).log_prob(actions)
-    return -(logp * returns_normalized).mean()
+    return -(logp * advantages).mean()
 
 
 def reward_to_go(rewards, gamma=0.99):
-    """
-    Compute discounted reward-to-go for each timestep in a trajectory.
-
-    For each timestep t, computes the sum of discounted future rewards:
-    R_t = r_t + gamma*r_{t+1} + gamma^2*r_{t+2} + ... + gamma^{T-t}*r_T
-
-    Args:
-        rewards: List of rewards received at each timestep.
-        gamma: Discount factor for future rewards (0 < gamma <= 1).
-
-    Returns:
-        List of discounted cumulative returns, one per timestep.
-    """
+    """Compute reward-to-go for each time step in a trajectory."""
     n = len(rewards)
     rtg = [0] * n
     future_reward = 0.0
@@ -104,31 +93,37 @@ def reward_to_go(rewards, gamma=0.99):
 def train_epoch(
     env: gym.Env,
     policy_model: nn.Module,
-    optimizer: torch.optim.Optimizer,
+    policy_optimizer: torch.optim.Optimizer,
+    value_model: nn.Module,
+    value_optimizer: torch.optim.Optimizer,
     batch_size: int,
 ):
     """
-    Train the policy for one epoch using simple policy gradient with reward-to-go.
+    Train both actor and critic for one epoch by collecting trajectories.
 
-    Collects observations, actions, and rewards by interacting with the
-    environment until reaching the batch size. Computes discounted reward-to-go
-    for each timestep, then performs a policy gradient update with gradient
-    clipping for stability.
+    Collects observations, actions, and rewards until reaching the batch size,
+    then updates both the policy network (actor) and value network (critic).
+    The actor is trained with policy gradients weighted by advantages,
+    and the critic is trained to predict returns using MSE loss.
 
     Args:
         env: Gymnasium environment to interact with.
-        policy_model: Policy neural network to train.
-        optimizer: PyTorch optimizer for updating the policy.
+        policy_model: Policy neural network (actor) to train.
+        policy_optimizer: PyTorch optimizer for updating the policy.
+        value_model: Value neural network (critic) to train.
+        value_optimizer: PyTorch optimizer for updating the value function.
         batch_size: Number of timesteps to collect before updating.
 
     Returns:
-        tuple: (batch_loss, episode_returns, episode_lengths)
-            - batch_loss: The computed policy gradient loss for this batch.
+        tuple: (batch_loss, value_loss, episode_returns, episode_lengths)
+            - batch_loss: The policy gradient loss for this batch.
+            - value_loss: The MSE loss for the value function.
             - episode_returns: List of total returns for each completed episode.
             - episode_lengths: List of lengths for each completed episode.
     """
     batch = {
         "observations": [],
+        "values": [],
         "actions": [],
         "returns": [],
         "episode_returns": [],
@@ -169,18 +164,39 @@ def train_epoch(
         batch["actions"] = batch["actions"][:num_returns]
         batch["returns"] = batch["returns"][:num_returns]
 
-    optimizer.zero_grad()
+    # Convert batch data to tensors (done once for efficiency)
+    obs_tensor = torch.tensor(batch["observations"], dtype=torch.float32)
+    act_tensor = torch.tensor(batch["actions"], dtype=torch.int32)
+    returns_tensor = torch.tensor(batch["returns"], dtype=torch.float32)
+
+    # Normalize returns for stability (optional but recommended)
+    returns_normalized = (returns_tensor - returns_tensor.mean()) / (returns_tensor.std() + 1e-8)
+
+    # Step 1: Update policy network (i.e., the actor).
+    policy_optimizer.zero_grad()
+    values = value_model(obs_tensor).squeeze(-1)
     batch_loss = compute_loss(
-        observations=torch.tensor(batch["observations"], dtype=torch.float32),
-        actions=torch.tensor(batch["actions"], dtype=torch.int32),
-        returns=torch.tensor(batch["returns"], dtype=torch.float32),
+        observations=obs_tensor,
+        actions=act_tensor,
+        returns=returns_normalized,
+        values=values,
         policy_model=policy_model,
     )
     batch_loss.backward()
     # Clip gradients to prevent exploding gradients.
     torch.nn.utils.clip_grad_norm_(policy_model.parameters(), max_norm=0.5)
-    optimizer.step()
-    return batch_loss, batch["episode_returns"], batch["episode_lengths"]
+    policy_optimizer.step()
+
+    # Step 2: Update value network (i.e., the critic).
+    # Recompute values to get fresh computation graph for value loss
+    value_optimizer.zero_grad()
+    values = value_model(obs_tensor).squeeze(-1)
+    value_loss = nn.functional.mse_loss(values, returns_normalized)
+    value_loss.backward()
+    torch.nn.utils.clip_grad_norm_(value_model.parameters(), max_norm=0.5)
+    value_optimizer.step()
+
+    return batch_loss, value_loss, batch["episode_returns"], batch["episode_lengths"]
 
 
 def train(
@@ -192,12 +208,17 @@ def train(
     seed=None,
 ):
     """
-    Train a policy using vanilla policy gradient (REINFORCE with reward-to-go).
+    Train a policy using Actor-Critic with advantage estimation.
+
+    The actor (policy network) is trained with policy gradients weighted by
+    advantages. The critic (value network) is trained to predict returns
+    using MSE loss. The advantage is computed as the difference between
+    observed returns and value predictions.
 
     Args:
         env_name: Name of the Gymnasium environment to train on.
         hidden_sizes: List of hidden layer sizes for the policy network.
-        lr: Learning rate for the Adam optimizer.
+        lr: Learning rate for the policy optimizer (value network uses lr*10).
         epochs: Number of training epochs.
         batch_size: Number of timesteps to collect per epoch before updating.
         seed: Random seed for reproducibility. If None, uses random behavior.
@@ -219,17 +240,29 @@ def train(
 
     # Instantiate the policy function (which is a neural network)
     policy_model = mlp(sizes=[observations_dim] + hidden_sizes + [number_actions])
+    value_model = mlp(
+        sizes=[observations_dim] + [64] + [1]
+    )  # We output a scalar which is the state value estimate.
 
-    optimizer = Adam(policy_model.parameters(), lr=lr)
+    policy_optimizer = Adam(policy_model.parameters(), lr=lr)
+    value_optimizer = Adam(
+        value_model.parameters(), lr=lr * 10
+    )
+
     for epoch in range(epochs):
         start_time = time.time()
-        batch_loss, batch_returns, batch_lengths = train_epoch(
-            env, policy_model, optimizer, batch_size
+        batch_loss, value_loss, batch_returns, batch_lengths = train_epoch(
+            env,
+            policy_model,
+            policy_optimizer,
+            value_model,
+            value_optimizer,
+            batch_size,
         )
 
         epoch_time = time.time() - start_time
         print(
-            f"Epoch {epoch + 1}/{epochs}, Loss: {batch_loss.item():.3f}, "
+            f"Epoch {epoch + 1}/{epochs}, Loss: {batch_loss.item():.3f}, Value Loss: {value_loss.item():.3f}, "
             f"Return: {np.mean(batch_returns):.3f}±{np.std(batch_returns):.3f}, "
             f"Length: {np.mean(batch_lengths):.3f}±{np.std(batch_lengths):.3f}, "
             f"Time: {epoch_time:.3f}s"
