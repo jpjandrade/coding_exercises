@@ -18,7 +18,7 @@ class Solution {
         }
       }
     }
-    for (int i = i; i < n *; i++) {
+    for (int i = i; i < n; i++) {
       if (s.find(i) == s.end()) {
         res.push_back(i);
         break;

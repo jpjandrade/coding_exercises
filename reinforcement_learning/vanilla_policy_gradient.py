@@ -27,14 +27,26 @@ def compute_loss(observations, actions, reward_weights, policy_model):
     """
     observations = observations
     actions = actions
-    reward_weights = reward_weights
+    # Baseline to reduce reward variance.
+    reward_weights_normalized = reward_weights - reward_weights.mean()
     logp = get_policy_action_distribution(policy_model, observations).log_prob(actions)
-    return -(logp * reward_weights).mean()
+    return -(logp * reward_weights_normalized).mean()
 
 
 def sample_action(model, observations):
     observations = observations
     return get_policy_action_distribution(model, observations).sample().item()
+
+
+def reward_to_go(rewards):
+    """Compute reward-to-go for each time step in a trajectory."""
+    n = len(rewards)
+    rtg = [0] * n
+    future_reward = 0.0
+    for t in reversed(range(n)):
+        future_reward += rewards[t]
+        rtg[t] = future_reward
+    return rtg
 
 
 def train_epoch(
@@ -71,7 +83,8 @@ def train_epoch(
             batch["episode_returns"].append(episode_return)
             batch["episode_lengths"].append(episode_length)
 
-            batch["reward_weights"] += [episode_return] * episode_length
+            # Replace by [episode_return] * episode_length to disable reward to go.
+            batch["reward_weights"] += list(reward_to_go(episode_rewards))
             observation, _ = env.reset()
             episode_rewards = []
 
