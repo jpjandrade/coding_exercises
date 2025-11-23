@@ -136,7 +136,7 @@ def train_epoch(
 
     terminated, truncated = False, False
 
-    while len(batch["observations"]) < batch_size:
+    while len(batch["observations"]) < batch_size or not (terminated or truncated):
         batch["observations"].append(observation.copy())
         actions = sample_action(
             policy_model, torch.tensor(observation, dtype=torch.float32)
@@ -154,15 +154,6 @@ def train_epoch(
             batch["returns"] += list(reward_to_go(episode_rewards))
             observation, _ = env.reset()
             episode_rewards = []
-
-    # Discard incomplete episodes: remove observations/actions beyond what we have returns for.
-    # This is relevant if we ended the batch in the middle of an episode.
-    num_observations = len(batch["observations"])
-    num_returns = len(batch["returns"])
-    if num_observations > num_returns:
-        batch["observations"] = batch["observations"][:num_returns]
-        batch["actions"] = batch["actions"][:num_returns]
-        batch["returns"] = batch["returns"][:num_returns]
 
     # Convert batch data to tensors (done once for efficiency)
     obs_tensor = torch.tensor(batch["observations"], dtype=torch.float32)
@@ -201,10 +192,10 @@ def train_epoch(
 
 def train(
     env_name="CartPole-v1",
-    hidden_sizes=[32],
-    lr=1e-2,
+    hidden_sizes=[64],
+    lr=1e-3,
     epochs=500,
-    batch_size=50000,
+    batch_size=5000,
     seed=None,
 ):
     """
@@ -241,7 +232,7 @@ def train(
     # Instantiate the policy function (which is a neural network)
     policy_model = mlp(sizes=[observations_dim] + hidden_sizes + [number_actions])
     value_model = mlp(
-        sizes=[observations_dim] + [64] + [1]
+        sizes=[observations_dim] + hidden_sizes + [1]
     )  # We output a scalar which is the state value estimate.
 
     policy_optimizer = Adam(policy_model.parameters(), lr=lr)
