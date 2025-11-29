@@ -9,6 +9,12 @@ from torch.optim import Adam
 from torch.utils.data import TensorDataset, DataLoader
 
 
+def layer_init(layer, std=np.sqrt(2), bias_const=0.0):
+    torch.nn.init.orthogonal_(layer.weight, std)
+    torch.nn.init.constant_(layer.bias, bias_const)
+    return layer
+
+
 def mlp(sizes, activation=nn.Tanh, output_activation=nn.Identity):
     """
     Build a simple neural network.
@@ -23,8 +29,14 @@ def mlp(sizes, activation=nn.Tanh, output_activation=nn.Identity):
     """
     layers = []
     for j in range(len(sizes) - 2):
-        layers += [nn.Linear(sizes[j], sizes[j + 1]), activation()]
-    layers += [nn.Linear(sizes[-2], sizes[-1]), output_activation()]
+        layers += [layer_init(nn.Linear(sizes[j], sizes[j + 1])), activation()]
+
+    # For the actor output, force all intial weights to be similar.
+    output_std = 1 if sizes[-1] == 1 else 0.01
+    layers += [
+        layer_init(nn.Linear(sizes[-2], sizes[-1]), std=output_std),
+        output_activation(),
+    ]
     return nn.Sequential(*layers)
 
 
@@ -58,7 +70,13 @@ def sample_action(model, observations):
 
 
 def compute_ppo_loss(
-    observations, actions, advantages, policy_model, old_log_prob, clip_ratio=0.2
+    observations,
+    actions,
+    advantages,
+    policy_model,
+    old_log_prob,
+    clip_ratio=0.2,
+    entropy_coef=0.0,
 ):
     """
     PPO (Proximal Policy Optimization) clipped surrogate loss.
@@ -73,20 +91,24 @@ def compute_ppo_loss(
         policy_model: Policy neural network (the actor).
         old_log_prob: Tensor of log probabilities from the behavior policy.
         clip_ratio: Clipping parameter epsilon (default 0.2).
+        entropy_coef: Entropy regularization coefficient (default 0.01).
 
     Returns:
-        Tensor: The PPO clipped policy loss.
+        Tensor: The PPO clipped policy loss with entropy bonus.
     """
     # Compute the probability ratio between new and old policies.
-    new_log_prob = get_policy_action_distribution(policy_model, observations).log_prob(
-        actions
-    )
+    action_probabilities = get_policy_action_distribution(policy_model, observations)
+    new_log_prob = action_probabilities.log_prob(actions)
     ratio = torch.exp(new_log_prob - old_log_prob)
     clipped_ratio = torch.clamp(ratio, 1 - clip_ratio, 1 + clip_ratio)
-    return -torch.min(ratio * advantages, clipped_ratio * advantages).mean()
+    policy_loss = -torch.min(ratio * advantages, clipped_ratio * advantages).mean()
+
+    distribution_entropy = action_probabilities.entropy().mean()
+    entropy_loss = -entropy_coef * distribution_entropy
+    return policy_loss + entropy_loss
 
 
-def compute_gae(rewards, values, next_values, dones, gamma=0.99, lambda_=0.95):
+def compute_gae(rewards, values, next_values, terminations, gamma=0.99, lambda_=0.95):
     """
     Compute Generalized Advantage Estimation.
 
@@ -105,12 +127,12 @@ def compute_gae(rewards, values, next_values, dones, gamma=0.99, lambda_=0.95):
     gae = 0
 
     # Compute TD errors: δ_t = r_t + γ*V(s_{t+1}) - V(s_t)
-    deltas = rewards + gamma * next_values * (1 - dones) - values
+    deltas = rewards + gamma * next_values * (1 - terminations) - values
 
     # Compute GAE recursively backwards
     for t in reversed(range(len(rewards))):
         # Multiplying in the end by gae is equivalent to advantages[t + 1], but avoids indexing issues.
-        gae = deltas[t] + gamma * lambda_ * (1 - dones[t]) * gae
+        gae = deltas[t] + gamma * lambda_ * (1 - terminations[t]) * gae
         advantages[t] = gae
 
     return advantages
@@ -118,6 +140,7 @@ def compute_gae(rewards, values, next_values, dones, gamma=0.99, lambda_=0.95):
 
 def train_epoch(
     env: gym.Env,
+    initial_observation: np.ndarray,
     policy_model: nn.Module,
     policy_optimizer: torch.optim.Optimizer,
     value_model: nn.Module,
@@ -152,18 +175,19 @@ def train_epoch(
         "next_observations": [],
         "actions": [],
         "rewards": [],
-        "dones": [],
+        "terminated": [],
         "episode_returns": [],
         "episode_lengths": [],
+        "episode_truncated": [],
     }
 
-    # First observation comes from starting distribution.
-    observation, _ = env.reset()
+    observation = initial_observation
     episode_rewards = []
 
     terminated, truncated = False, False
 
-    while len(batch["observations"]) < batch_size or not (terminated or truncated):
+    # Collect exactly batch_size timesteps (may end mid-episode)
+    for _ in range(batch_size):
         batch["observations"].append(observation.copy())
         actions = sample_action(
             policy_model, torch.tensor(observation, dtype=torch.float32)
@@ -172,7 +196,7 @@ def train_epoch(
         batch["actions"].append(actions)
         batch["rewards"].append(reward)
         batch["next_observations"].append(next_observation.copy())
-        batch["dones"].append(terminated or truncated)
+        batch["terminated"].append(terminated)
 
         episode_rewards.append(reward)
 
@@ -182,6 +206,9 @@ def train_epoch(
             episode_return, episode_length = sum(episode_rewards), len(episode_rewards)
             batch["episode_returns"].append(episode_return)
             batch["episode_lengths"].append(episode_length)
+
+            batch["episode_truncated"].append(truncated)
+
             observation, _ = env.reset()
             episode_rewards = []
 
@@ -190,7 +217,7 @@ def train_epoch(
     next_obs_tensor = torch.tensor(batch["next_observations"], dtype=torch.float32)
     act_tensor = torch.tensor(batch["actions"], dtype=torch.int32)
     rewards_tensor = torch.tensor(batch["rewards"], dtype=torch.float32)
-    dones_tensor = torch.tensor(batch["dones"], dtype=torch.float32)
+    terminated_tensor = torch.tensor(batch["terminated"], dtype=torch.float32)
 
     with torch.no_grad():
         values = value_model(obs_tensor).squeeze(-1)
@@ -200,7 +227,7 @@ def train_epoch(
         ).log_prob(act_tensor)
 
         advantages = compute_gae(
-            rewards_tensor, values, next_values, dones_tensor, gamma=gamma
+            rewards_tensor, values, next_values, terminated_tensor, gamma=gamma
         )
         returns = advantages + values
 
@@ -249,18 +276,20 @@ def train_epoch(
         np.average(losses["value_loss"]),
         batch["episode_returns"],
         batch["episode_lengths"],
+        batch["episode_truncated"],
+        observation,
     )
 
 
 def train(
-    env_name="CartPole-v1",
-    hidden_sizes=[64],
-    lr=3e-3,
-    epochs=500,
-    batch_size=5000,
+    env_name="LunarLander-v2",
+    hidden_sizes=[64, 64],
+    lr=3e-4,
+    epochs=1000,
+    batch_size=2048,
     minibatch_size=64,
     train_iters=10,
-    gamma=0.95,
+    gamma=0.99,
     seed=None,
 ):
     """
@@ -284,12 +313,13 @@ def train(
 
     env = gym.make(env_name)
 
+    # First observation comes from starting distribution.
     if seed is not None:
-        env.reset(seed=seed)
+        observation, _ = env.reset(seed=seed)
     else:
-        env.reset()
+        observation, _ = env.reset()
 
-    observations_dim = env.observation_space.shape[0]
+    observations_dim = observation.shape[0]
     number_actions = env.action_space.n
 
     # Instantiate the policy function (which is a neural network)
@@ -299,12 +329,20 @@ def train(
     )  # We output a scalar which is the state value estimate.
 
     policy_optimizer = Adam(policy_model.parameters(), lr=lr)
-    value_optimizer = Adam(value_model.parameters(), lr=lr * 5)
+    value_optimizer = Adam(value_model.parameters(), lr=lr)
 
     for epoch in range(epochs):
         start_time = time.time()
-        batch_loss, value_loss, batch_returns, batch_lengths = train_epoch(
+        (
+            batch_loss,
+            value_loss,
+            batch_returns,
+            batch_lengths,
+            batch_truncated,
+            observation,
+        ) = train_epoch(
             env,
+            observation,
             policy_model,
             policy_optimizer,
             value_model,
@@ -315,11 +353,15 @@ def train(
             gamma,
         )
 
+        # A "Success" is when the episode ends because of Truncation (time limit), not Termination (death)
+        success_rate = np.mean(batch_truncated) if batch_truncated else 0.0
+
         epoch_time = time.time() - start_time
         print(
             f"Epoch {epoch + 1}/{epochs}, Loss: {batch_loss:.3f}, Value Loss: {value_loss:.3f}, "
             f"Return: {np.mean(batch_returns):.3f}±{np.std(batch_returns):.3f}, "
             f"Length: {np.mean(batch_lengths):.3f}±{np.std(batch_lengths):.3f}, "
+            f"Success: {success_rate * 100:.0f}%, "  # Prints e.g., "Success: 95%"
             f"Time: {epoch_time:.3f}s"
         )
 
@@ -327,4 +369,28 @@ def train(
 
 
 if __name__ == "__main__":
-    train()
+    # Hyperparameter configurations for different environments
+    CARTPOLE_PARAMS = {
+        "env_name": "CartPole-v1",
+        "hidden_sizes": [64],
+        "lr": 3e-3,
+        "epochs": 500,
+        "batch_size": 5000,
+        "minibatch_size": 64,
+        "train_iters": 10,
+        "gamma": 0.95,
+    }
+
+    LUNARLANDER_PARAMS = {
+        "env_name": "LunarLander-v3",
+        "hidden_sizes": [64, 64],
+        "lr": 3e-4,
+        "epochs": 1000,
+        "batch_size": 2048,
+        "minibatch_size": 64,
+        "train_iters": 10,
+        "gamma": 0.99,
+    }
+
+    # Choose which environment to train
+    train(**LUNARLANDER_PARAMS)
