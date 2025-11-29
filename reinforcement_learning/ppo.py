@@ -76,7 +76,7 @@ def compute_ppo_loss(
     policy_model,
     old_log_prob,
     clip_ratio=0.2,
-    entropy_coef=0.0,
+    entropy_coef=0.01,
 ):
     """
     PPO (Proximal Policy Optimization) clipped surrogate loss.
