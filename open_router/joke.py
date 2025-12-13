@@ -1,10 +1,6 @@
 import asyncio
 from openai import AsyncOpenAI
 
-api_key = open("open_router_token.txt", "r", encoding="utf-8").read().strip()
-
-client = AsyncOpenAI(base_url="https://openrouter.ai/api/v1", api_key=api_key)
-
 MODELS = {
     "chatgpt": "openai/gpt-5.2-chat",
     "gemini": "google/gemini-3-pro-preview",
@@ -13,7 +9,7 @@ MODELS = {
 }
 
 
-async def get_joke(model_url: str) -> str:
+async def get_joke(client: AsyncOpenAI, model_url: str) -> str:
     response = await client.chat.completions.create(
         model=model_url,
         extra_body={
@@ -31,13 +27,20 @@ async def get_joke(model_url: str) -> str:
         temperature=1.0,
         max_tokens=200,
     )
+
+    if not response.choices or not response.choices[0].message.content:
+        print("Could not generate joke for ", model_url, ", received: ", response)
     return response.choices[0].message.content
 
 
 async def main():
+    api_key = open("open_router_token.txt", "r", encoding="utf-8").read().strip()
+
+    client = AsyncOpenAI(base_url="https://openrouter.ai/api/v1", api_key=api_key)
+
     tasks = []
     for model_name, model_url in MODELS.items():
-        tasks.append(asyncio.create_task(get_joke(model_url)))
+        tasks.append(asyncio.create_task(get_joke(client, model_url)))
 
     jokes = await asyncio.gather(*tasks)
 
