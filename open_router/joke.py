@@ -30,6 +30,7 @@ async def get_joke(client: AsyncOpenAI, model_url: str) -> str:
 
     if not response.choices or not response.choices[0].message.content:
         print("Could not generate joke for ", model_url, ", received: ", response)
+        return ""
     return response.choices[0].message.content
 
 
