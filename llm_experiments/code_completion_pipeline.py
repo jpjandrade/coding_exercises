@@ -1,3 +1,4 @@
+import argparse
 import asyncio
 import random
 
@@ -234,20 +235,62 @@ class Trie:
 
 
 def split_at_random(input_text: str) -> tuple[str, str]:
-    i = random.randint(MIN_SPLIT_PADDING, len(input_text) - MIN_SPLIT_PADDING)
+    # Guard for when the text is too small.
+    split_padding = min(MIN_SPLIT_PADDING, len(input_text) // 2)
+
+    i = random.randint(split_padding, len(input_text) - split_padding)
     return input_text[:i], input_text[i:]
 
 
-api_key = open("open_router_token.txt", "r", encoding="utf-8").read().strip()
-cc = CodeCompleter(api_key, MODEL, verbose_failures=True)
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "-n", "--limit",
+        type=int,
+        default=None,
+        help="Limit the number of corpus entries to process (default: process all)"
+    )
+    args = parser.parse_args()
 
-# TODO: split evals into complexity.
-corpus = corpus_simple + corpus_medium + corpus_complex
-split_corpus: dict[str, str] = {
-    k: v for k, v in (split_at_random(entry) for entry in corpus)
-}
-print("Generating completions...")
-results = asyncio.run(cc.complete_many(split_corpus.keys()))
-print("Done!")
+    try:
+        api_key = open("open_router_token.txt", "r", encoding="utf-8").read().strip()
+    except FileNotFoundError:
+        print("API Key file not found!")
+        return
 
-eval_results(split_corpus, results)
+    cc = CodeCompleter(api_key, MODEL, verbose_failures=True)
+
+    # TODO: split evals into complexity.
+    corpus = corpus_simple + corpus_medium + corpus_complex
+
+    if args.limit is not None:
+        corpus = corpus[:args.limit]
+        print(f"Processing {len(corpus)} entries (limited by --limit flag)")
+    else:
+        print(f"Processing all {len(corpus)} entries")
+
+    split_corpus: dict[str, str] = {
+        k: v for k, v in (split_at_random(entry) for entry in corpus)
+    }
+    print("Generating completions...")
+    results = asyncio.run(cc.complete_many(split_corpus.keys()))
+    print("Done!")
+
+    evaluation_results = eval_results(split_corpus, results)
+
+    print("\n" + "=" * 80)
+    print("EVALUATION RESULTS")
+    print("=" * 80 + "\n")
+
+    for result in evaluation_results:
+        print(f"Input: {result['input'][:60]}...")
+        print(f"Generated: {result['output'][:60]}...")
+        print(f"Original:  {result['original_completion'][:60]}...")
+        print(f"Scores --> Parser: {result['parser_score']}, "
+              f"Linter: {result['linter_score']:.2f}, "
+              f"BLEU: {result['bleu_score']:.3f}")
+        print("-" * 80)
+
+
+if __name__ == "__main__":
+    main()

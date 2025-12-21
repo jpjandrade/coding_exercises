@@ -7,6 +7,7 @@ from openai.types.chat import ChatCompletionMessageParam
 BASE_URL: str = "https://openrouter.ai/api/v1"
 MAX_COMPLETION_TOKENS: int = 500
 TEMPERATURE: float = 0.5
+CONCURRENCY_LIMIT: int = 5
 
 SYSTEM_MESSAGE: str = """
 You are a code completion software LLM. When you receive an input code,
@@ -23,6 +24,7 @@ class CodeCompleter:
         self.client: AsyncOpenAI = AsyncOpenAI(api_key=api_key, base_url=BASE_URL)
         self.model: str = model
         self.verbose_failures: bool = verbose_failures
+        self.semaphore = asyncio.Semaphore(CONCURRENCY_LIMIT)
 
     def _verify_response(self, input_string: str, response) -> bool:
         if not response.choices:
@@ -47,17 +49,17 @@ class CodeCompleter:
             {"role": "system", "content": SYSTEM_MESSAGE},
             {"role": "user", "content": input_string},
         ]
-
-        try:
-            response = await self.client.chat.completions.create(
-                model=self.model,
-                messages=messages,
-                temperature=TEMPERATURE,
-                max_completion_tokens=MAX_COMPLETION_TOKENS,
-            )
-        except Exception as e:
-            print(f"Got exception {e} for {input_string}")
-            return ""
+        async with self.semaphore:
+            try:
+                response = await self.client.chat.completions.create(
+                    model=self.model,
+                    messages=messages,
+                    temperature=TEMPERATURE,
+                    max_completion_tokens=MAX_COMPLETION_TOKENS,
+                )
+            except Exception as e:
+                print(f"Got exception {e} for {input_string}")
+                return ""
 
         if not self._verify_response(input_string, response):
             if self.verbose_failures:
