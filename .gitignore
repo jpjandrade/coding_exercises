@@ -4,6 +4,7 @@ db.sqlite3
 __pycache__
 target/
 project/
+data/
 *.sbt
 *.txt
 *.hdf5
