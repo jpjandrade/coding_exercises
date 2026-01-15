@@ -302,7 +302,7 @@ class DataLoaderLite:
         return x, y
 
     def get_steps_per_epoch(self):
-        return len(self.tokens) // (B * T)
+        return len(self.tokens) // (self.B * self.T)
 
 
 num_return_sequences = 5

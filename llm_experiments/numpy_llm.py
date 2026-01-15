@@ -36,13 +36,12 @@ class AttentionBlock:
         # Softmax
         max_logit = np.max(masked_logits, axis=-1, keepdims=True)
         exp_logits = np.exp(masked_logits - max_logit)
-        attn = exp_logits / np.sum(exp_logits, axis=-1, keepdims=True)
+        attn_probs = exp_logits / np.sum(exp_logits, axis=-1, keepdims=True)
 
-        attention_logits = np.matmul(attn, v)
+        attn_out = np.matmul(attn_probs, v)
 
         # reshape back to the initial format
-        output = attention_logits.transpose(0, 2, 1, 3).reshape(B, T, C)
+        output = attn_out.transpose(0, 2, 1, 3).reshape(B, T, C)
 
-        # optional: linear layer or activation here
         output = np.matmul(output, self.w_o)
         return output
