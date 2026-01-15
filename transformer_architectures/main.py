@@ -5,6 +5,7 @@ import torch
 import torch.nn.functional as F
 from dataloader import DataLoaderLite
 from model_registry import ModelConfig, LoadModel
+from gpt_2 import GPT2, GPT2Config
 
 # Set device based on what's available.
 device = "cpu"
@@ -32,27 +33,30 @@ class TrainingConfig:
 
 
 training_config = TrainingConfig(
-    n_steps=10, learning_rate=3e-4, batch_size=8, sequence_length=1024
+    n_steps=100, learning_rate=1e-3, batch_size=8, sequence_length=1024
 )
 
 data = DataLoaderLite(training_config.batch_size, training_config.sequence_length)
 
-model_config = ModelConfig(name="gpt2")
+model_config = GPT2Config()
 model = LoadModel(model_config)
 optimizer = torch.optim.AdamW(model.parameters(), lr=3e-4)
 
 # Set device in the top, could be whatever you want.
 model.to(device)
-model = torch.compile(model, backend="aot_eager")
+# Weight sharing after moving to device to avoid MPS issues
+if isinstance(model, GPT2):
+    model.tie_weights()
 
 for i in range(training_config.n_steps):
     t_start = time.time()
     optimizer.zero_grad()
     x, y = data.next_batch()
+    x = x.to(device)
+    y = y.to(device)
 
     logits = model(x)
-
-    loss = F.cross_entropy(logits.view(-1), y.view(-1))
+    loss = F.cross_entropy(logits.view(-1, logits.size(-1)), y.view(-1))
 
     loss.backward()
     optimizer.step()
