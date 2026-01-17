@@ -14,6 +14,13 @@ class MLP:
         self.d_b_in = np.zeros_like(self.b_in)
         self.d_b_out = np.zeros_like(self.b_out)
 
+        self.weights_with_grad = {
+            "w_in": [self.w_in, self.d_w_in],
+            "w_out": [self.w_out, self.d_w_out],
+            "b_in": [self.b_in, self.d_b_in],
+            "b_out": [self.b_out, self.d_b_out],
+        }
+
     def forward(self, x: np.ndarray):
         # [B, T, C] @ [C, 4 * C] -> [B, T, 4 * C]
         z_in = np.matmul(x, self.w_in) + self.b_in
@@ -57,7 +64,7 @@ class MLP:
 
         # dL / da_in = \sum_k dL/d_out_k W_jk = dY @ W^T
         # [B, T, 4 * C] = [B, T, C] @ [C, 4 * C]
-        d_a_in = np.matmul(d_out, self.w_out.transpose())
+        d_a_in = np.matmul(d_out, self.w_out.T)
 
         # d_z_in is just backward prop of the relu:
         # dL / d_z_in = dL / d_a_in d_a_in/d_z_in = dL_d_a_in * I(z_in > 0)
@@ -72,7 +79,7 @@ class MLP:
         self.d_b_in += d_z_in.sum(axis=(0, 1))
 
         # We need to return d_x, so we do:
-        d_x = np.matmul(d_z_in, self.w_in.transpose())
+        d_x = np.matmul(d_z_in, self.w_in.T)
 
         self.cache = {}
 
