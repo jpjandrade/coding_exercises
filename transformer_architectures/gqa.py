@@ -8,28 +8,49 @@ from model_registry import ModelConfig, register_model
 
 
 @dataclass
-class GPT2Config(ModelConfig):
-    """GPT-2 specific configuration"""
+class GQATransformerConfig(ModelConfig):
+    """Grouped Query Attention specific configuration.
 
-    name: str = "gpt2"  # Default name
+    Attributes:
+        n_head: Number of query heads.
+        n_group: Number of query heads that share a single KV head.
+                 num_kv_heads = n_head // n_group.
+                 E.g., n_head=12, n_group=4 -> 3 KV heads, each shared by 4 query heads.
+    """
+
+    name: str = "gqa"  # Default name
     vocab_size: int = 50257
     n_embed: int = 768
     n_layer: int = 12
     n_head: int = 12
+    n_group: int = 4
     block_size: int = 1024
 
 
 class CausalSelfAttention(nn.Module):
-    def __init__(self, config: GPT2Config):
+    """Grouped Query Attention (GQA) as introduced in Ainslie et al. 2023.
+
+    GQA reduces KV cache memory by using fewer key-value heads than query heads.
+    Multiple query heads share a single KV head, interpolating between:
+    - MHA (n_group=1): Each query head has its own KV head
+    - MQA (n_group=n_head): All query heads share one KV head
+    """
+
+    def __init__(self, config: GQATransformerConfig):
         super().__init__()
 
-        self.qvk = nn.Linear(config.n_embed, 3 * config.n_embed)
+        self.head_dim = config.n_embed // config.n_head
+        self.num_kv_head = config.n_head // config.n_group
+        self.n_group = config.n_group
+
+        self.w_q = nn.Linear(config.n_embed, config.n_embed)
+        self.w_k = nn.Linear(config.n_embed, self.num_kv_head * self.head_dim)
+        self.w_v = nn.Linear(config.n_embed, self.num_kv_head * self.head_dim)
         self.w_o = nn.Linear(config.n_embed, config.n_embed)
         self.w_o.NANOGPT_SCALE_INIT = 1  # type: ignore
 
         self.n_head = config.n_head
         self.n_embed = config.n_embed
-        self.head_dim = config.n_embed // config.n_head
 
         self.causal_mask: torch.Tensor
         self.register_buffer(
@@ -42,15 +63,21 @@ class CausalSelfAttention(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         B, T, C = x.shape
 
-        # [B, T, 3 * C] tensor with the tensors
-        qkv: torch.Tensor = self.qvk(x)
-
-        q, k, v = qkv.split(self.n_embed, dim=2)
+        # q: [B, T, C], k/v: [B, T, num_kv_head * head_dim]
+        q: torch.Tensor = self.w_q(x)
+        k: torch.Tensor = self.w_k(x)
+        v: torch.Tensor = self.w_v(x)
 
         # Now we split into proper [B, n_heads, T, head_dim] for multi head attention.
         q = q.view(B, T, self.n_head, self.head_dim).transpose(1, 2)
-        k = k.view(B, T, self.n_head, self.head_dim).transpose(1, 2)
-        v = v.view(B, T, self.n_head, self.head_dim).transpose(1, 2)
+
+        # K,V are [B, T, n_kv_head, head_dim]
+        k = k.view(B, T, self.num_kv_head, self.head_dim).transpose(1, 2)
+        v = v.view(B, T, self.num_kv_head, self.head_dim).transpose(1, 2)
+
+        # But then we replicate them for [B, T, n_head, head_dim]
+        k = k.repeat_interleave(self.n_group, dim=1)
+        v = v.repeat_interleave(self.n_group, dim=1)
 
         attn = (q @ k.transpose(-1, -2)) / math.sqrt(k.size(-1))
 
@@ -58,7 +85,7 @@ class CausalSelfAttention(nn.Module):
 
         attn = F.softmax(attn, dim=-1)
 
-        # Attn is [B, n_head, T, T], v is [B, n_head, T, C]. Out is back to [B, n_head, T, C]
+        # Attn is [B, n_head, T, T], v is [B, n_head, T, head_dim]. Out is [B, n_head, T, head_dim]
         out = attn @ v
         out = out.transpose(1, 2).contiguous().view(B, T, C)
 
@@ -68,7 +95,7 @@ class CausalSelfAttention(nn.Module):
 
 
 class MLP(nn.Module):
-    def __init__(self, config: GPT2Config):
+    def __init__(self, config: GQATransformerConfig):
         super().__init__()
         self.mlp = nn.Sequential(
             nn.Linear(config.n_embed, 4 * config.n_embed),
@@ -83,7 +110,7 @@ class MLP(nn.Module):
 class Block(nn.Module):
     """Transformer block: communication followed by computation"""
 
-    def __init__(self, config: GPT2Config):
+    def __init__(self, config: GQATransformerConfig):
         super().__init__()
 
         self.ln_1 = nn.LayerNorm(config.n_embed)
@@ -98,13 +125,12 @@ class Block(nn.Module):
         return x
 
 
-class GPT2(nn.Module):
+class GQATransformer(nn.Module):
     """
-    GPT-2 code as written by Karpathy in his youtube series.
-    The baseline for this exercise, everything else will be likely a variation of this.
+    GPT-2 code with Grouped Query Attention added.
     """
 
-    def __init__(self, config: GPT2Config):
+    def __init__(self, config: GQATransformerConfig):
         super().__init__()
         self._validate_config(config)
 
@@ -127,10 +153,15 @@ class GPT2(nn.Module):
 
         self.apply(self._init_weights)
 
-    def _validate_config(self, config: GPT2Config):
+    def _validate_config(self, config: GQATransformerConfig):
         if config.n_embed % config.n_head != 0:
             raise ValueError(
                 f"n_embed ({config.n_embed}) must be divisible by n_head ({config.n_head})"
+            )
+
+        if config.n_head % config.n_group != 0:
+            raise ValueError(
+                f"n_head ({config.n_head}) must be divisible by n_group ({config.n_group})"
             )
 
     def _init_weights(self, module: nn.Module):
@@ -187,6 +218,6 @@ class GPT2(nn.Module):
         return per_token_logits
 
 
-@register_model("gpt2")
-def create_gpt2(model_config):
-    return GPT2(model_config)
+@register_model("gqa")
+def create_gqa(model_config):
+    return GQATransformer(model_config)

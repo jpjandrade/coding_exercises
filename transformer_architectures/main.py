@@ -4,8 +4,8 @@ from dataclasses import dataclass
 import torch
 import torch.nn.functional as F
 from dataloader import DataLoaderLite
-from model_registry import ModelConfig, LoadModel
-from gpt_2 import GPT2, GPT2Config
+from model_registry import LoadModel
+from gqa import GQATransformerConfig
 
 # Set device based on what's available.
 device = "cpu"
@@ -38,15 +38,15 @@ training_config = TrainingConfig(
 
 data = DataLoaderLite(training_config.batch_size, training_config.sequence_length)
 
-model_config = GPT2Config()
+model_config = GQATransformerConfig()
 model = LoadModel(model_config)
 optimizer = torch.optim.AdamW(model.parameters(), lr=3e-4)
 
 # Set device in the top, could be whatever you want.
 model.to(device)
 # Weight sharing after moving to device to avoid MPS issues
-if isinstance(model, GPT2):
-    model.tie_weights()
+if hasattr(model, "tie_weights"):
+    model.tie_weights()  # type: ignore
 
 for i in range(training_config.n_steps):
     t_start = time.time()
