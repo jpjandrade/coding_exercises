@@ -8,17 +8,10 @@ from model_registry import ModelConfig, register_model
 
 
 @dataclass
-class GQATransformerConfig(ModelConfig):
-    """Grouped Query Attention specific configuration.
+class ModernTransformerConfig(ModelConfig):
+    """Configuration for ModernTransformer with GQA and RoPE."""
 
-    Attributes:
-        n_head: Number of query heads.
-        n_group: Number of query heads that share a single KV head.
-                 num_kv_heads = n_head // n_group.
-                 E.g., n_head=12, n_group=4 -> 3 KV heads, each shared by 4 query heads.
-    """
-
-    name: str = "gqa"  # Default name
+    name: str = "modern"
     vocab_size: int = 50257
     n_embed: int = 768
     n_layer: int = 12
@@ -27,8 +20,8 @@ class GQATransformerConfig(ModelConfig):
     max_seq_len: int = 1024
 
 
-class CausalSelfAttention(nn.Module):
-    """Grouped Query Attention (GQA) as introduced in Ainslie et al. 2023.
+class RotaryGQA(nn.Module):
+    """Grouped Query Attention (GQA) with RoPE embeddings.
 
     GQA reduces KV cache memory by using fewer key-value heads than query heads.
     Multiple query heads share a single KV head, interpolating between:
@@ -36,7 +29,7 @@ class CausalSelfAttention(nn.Module):
     - MQA (n_group=n_head): All query heads share one KV head
     """
 
-    def __init__(self, config: GQATransformerConfig):
+    def __init__(self, config: ModernTransformerConfig):
         super().__init__()
 
         self.head_dim = config.n_embed // config.n_head
@@ -60,6 +53,48 @@ class CausalSelfAttention(nn.Module):
             ),
         )
 
+        self.rotary_emb = RotaryPositionEmbedding(self.head_dim, config.max_seq_len)
+
+    def _rotate_half(self, x: torch.Tensor) -> torch.Tensor:
+        """Rotates half the hidden dims of the input."""
+        x1, x2 = x.chunk(2, dim=-1)
+        return torch.cat([-x2, x1], dim=-1)
+
+    def _apply_rotary_pos_emb(self, q: torch.Tensor, k: torch.Tensor, cos, sin):
+        batch, num_heads, seq_len, head_dim = q.shape
+        num_kv_heads = k.size(1)
+
+        # Reshape to expose pairs: [B, n_head, T, head_dim / 2, 2]]
+        q_pairs = q.view(batch, num_heads, seq_len, head_dim // 2, 2)
+        k_pairs = k.view(batch, num_kv_heads, seq_len, head_dim // 2, 2)
+
+        # Extract the two elements of each pair
+        q_even = q_pairs[..., 0]  # [batch, heads, seq, head_dim/2]
+        q_odd = q_pairs[..., 1]
+        k_even = k_pairs[..., 0]
+        k_odd = k_pairs[..., 1]
+
+        # Broadcast cos/sin: [seq_len, head_dim/2] -> [1, 1, seq_len, head_dim/2]
+        cos = cos.unsqueeze(0).unsqueeze(0)
+        sin = sin.unsqueeze(0).unsqueeze(0)
+
+        # Apply 2x2 rotation matrix to each pair:
+        # [cos θ  -sin θ] [x_even]
+        # [sin θ   cos θ] [x_odd ]
+        q_even_rot = q_even * cos - q_odd * sin
+        q_odd_rot = q_even * sin + q_odd * cos
+        k_even_rot = k_even * cos - k_odd * sin
+        k_odd_rot = k_even * sin + k_odd * cos
+
+        # Reassemble pairs back to original shape
+        q_rot = torch.stack([q_even_rot, q_odd_rot], dim=-1)  # [..., head_dim/2, 2]
+        k_rot = torch.stack([k_even_rot, k_odd_rot], dim=-1)
+
+        q_rot = q_rot.view(batch, num_heads, seq_len, head_dim)
+        k_rot = k_rot.view(batch, num_kv_heads, seq_len, head_dim)
+
+        return q_rot, k_rot
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         B, T, C = x.shape
 
@@ -75,7 +110,11 @@ class CausalSelfAttention(nn.Module):
         k = k.view(B, T, self.num_kv_head, self.head_dim).transpose(1, 2)
         v = v.view(B, T, self.num_kv_head, self.head_dim).transpose(1, 2)
 
-        # But then we replicate them for [B, T, n_head, head_dim]
+        # we rotate them according to RoPE angles
+        cos, sin = self.rotary_emb(x, T)
+        q, k = self._apply_rotary_pos_emb(q, k, cos, sin)
+
+        # Then we replicate them for [B, T, n_head, head_dim] for GQA
         k = k.repeat_interleave(self.n_group, dim=1)
         v = v.repeat_interleave(self.n_group, dim=1)
 
@@ -95,7 +134,7 @@ class CausalSelfAttention(nn.Module):
 
 
 class MLP(nn.Module):
-    def __init__(self, config: GQATransformerConfig):
+    def __init__(self, config: ModernTransformerConfig):
         super().__init__()
         self.mlp = nn.Sequential(
             nn.Linear(config.n_embed, 4 * config.n_embed),
@@ -110,36 +149,76 @@ class MLP(nn.Module):
 class Block(nn.Module):
     """Transformer block: communication followed by computation"""
 
-    def __init__(self, config: GQATransformerConfig):
+    def __init__(self, config: ModernTransformerConfig):
         super().__init__()
 
         self.ln_1 = nn.LayerNorm(config.n_embed)
-        self.attention = CausalSelfAttention(config)
+        self.attention = RotaryGQA(config)
         self.ln_2 = nn.LayerNorm(config.n_embed)
         self.mlp = MLP(config)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # Pre-norm, allowing for a gradient highway.
         x = x + self.attention(self.ln_1(x))
         x = x + self.mlp(self.ln_2(x))
 
         return x
 
 
-class GQATransformer(nn.Module):
-    """
-    GPT-2 code with Grouped Query Attention added.
+class RotaryPositionEmbedding(nn.Module):
+    def __init__(self, dim: int, max_seq_len: int = 8192, base: float = 10000.0):
+        super().__init__()
+        self.dim = dim
+        self.max_seq_len = max_seq_len
+
+        inv_freq = 1.0 / (base ** (torch.arange(0, dim, 2).float() / dim))
+        self.inv_freq: torch.Tensor
+        self.register_buffer("inv_freq", inv_freq)
+
+        # Pre-compute rotary embeddings up to max_seq_len
+        self._build_cache(max_seq_len)
+
+    def _build_cache(self, seq_len: int):
+        positions = torch.arange(
+            seq_len, device=self.inv_freq.device, dtype=self.inv_freq.dtype
+        )
+
+        # [seq_len] * [dim / 2] -> [seq_len, dim/2]
+        freqs = torch.outer(positions, self.inv_freq)
+        # [seq_len, dim]
+        self.cos_freqs: torch.Tensor
+        self.sin_freqs: torch.Tensor
+
+        self.register_buffer("cos_freqs", freqs.cos(), persistent=False)
+        self.register_buffer("sin_freqs", freqs.sin(), persistent=False)
+        
+        self.max_seq_len = seq_len
+
+    def forward(self, x, seq_len: int):
+        if seq_len > self.max_seq_len:
+            self._build_cache(seq_len)
+
+        return (
+            self.cos_freqs[:seq_len].to(x.dtype),
+            self.sin_freqs[:seq_len].to(x.dtype),
+        )
+
+
+class ModernTransformer(nn.Module):
+    """Decoder-only transformer with Grouped Query Attention (GQA) and RoPE.
+
+    Architecture inspired by LLaMA: uses RoPE for positional encoding and GQA
+    to reduce KV cache memory while maintaining model quality.
     """
 
-    def __init__(self, config: GQATransformerConfig):
+    def __init__(self, config: ModernTransformerConfig):
         super().__init__()
         self._validate_config(config)
 
         self.config = config
 
-        # Word to embeddings layer, the entry point of the whole thing :).
+        # Word to embeddings layer (no positional embeddings - RoPE handles position)
         self.wte: nn.Embedding = nn.Embedding(config.vocab_size, config.n_embed)
-        # The positional embeddings (wpe = word position embeddings).
-        self.wpe: nn.Embedding = nn.Embedding(config.max_seq_len, config.n_embed)
         # Hidden layers in the middle, the transformer blocks
         self.h: nn.ModuleList = nn.ModuleList(
             [Block(config) for _ in range(config.n_layer)]
@@ -153,15 +232,10 @@ class GQATransformer(nn.Module):
 
         self.apply(self._init_weights)
 
-    def _validate_config(self, config: GQATransformerConfig):
+    def _validate_config(self, config: ModernTransformerConfig):
         if config.n_embed % config.n_head != 0:
             raise ValueError(
                 f"n_embed ({config.n_embed}) must be divisible by n_head ({config.n_head})"
-            )
-
-        if config.n_head % config.n_group != 0:
-            raise ValueError(
-                f"n_head ({config.n_head}) must be divisible by n_group ({config.n_group})"
             )
 
     def _init_weights(self, module: nn.Module):
@@ -198,15 +272,8 @@ class GQATransformer(nn.Module):
                 f"Sequence length {T} exceeds max_seq_len {self.config.max_seq_len}"
             )
 
-        # B, T, n_embed
-        embeddings = self.wte(input_token_ids)
-        # T
-        pos = torch.arange(0, T, dtype=torch.long, device=input_token_ids.device)
-        # [T, n_embed]
-        pos_embeddings = self.wpe(pos)
-
-        # Becomes [B, T, n_embed] due to torch broadcastin
-        x = embeddings + pos_embeddings
+        # [B, T, n_embed] - position is encoded via RoPE in attention layers
+        x = self.wte(input_token_ids)
 
         for block in self.h:
             x = block(x)
@@ -218,6 +285,6 @@ class GQATransformer(nn.Module):
         return per_token_logits
 
 
-@register_model("gqa")
-def create_gqa(model_config):
-    return GQATransformer(model_config)
+@register_model("modern")
+def create_modern(model_config):
+    return ModernTransformer(model_config)

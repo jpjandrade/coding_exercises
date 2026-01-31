@@ -5,7 +5,7 @@ import torch
 import torch.nn.functional as F
 from dataloader import DataLoaderLite
 from model_registry import LoadModel
-from gqa import GQATransformerConfig
+from modern import ModernTransformerConfig
 
 # Set device based on what's available.
 device = "cpu"
@@ -38,9 +38,9 @@ training_config = TrainingConfig(
 
 data = DataLoaderLite(training_config.batch_size, training_config.sequence_length)
 
-model_config = GQATransformerConfig()
+model_config = ModernTransformerConfig()
 model = LoadModel(model_config)
-optimizer = torch.optim.AdamW(model.parameters(), lr=3e-4)
+optimizer = torch.optim.AdamW(model.parameters(), lr=training_config.learning_rate)
 
 # Set device in the top, could be whatever you want.
 model.to(device)

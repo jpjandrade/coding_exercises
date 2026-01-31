@@ -16,7 +16,7 @@ class GPT2Config(ModelConfig):
     n_embed: int = 768
     n_layer: int = 12
     n_head: int = 12
-    block_size: int = 1024
+    max_seq_len: int = 1024
 
 
 class CausalSelfAttention(nn.Module):
@@ -35,7 +35,7 @@ class CausalSelfAttention(nn.Module):
         self.register_buffer(
             "causal_mask",
             torch.tril(
-                torch.ones(config.block_size, config.block_size, dtype=torch.bool)
+                torch.ones(config.max_seq_len, config.max_seq_len, dtype=torch.bool)
             ),
         )
 
@@ -113,7 +113,7 @@ class GPT2(nn.Module):
         # Word to embeddings layer, the entry point of the whole thing :).
         self.wte: nn.Embedding = nn.Embedding(config.vocab_size, config.n_embed)
         # The positional embeddings (wpe = word position embeddings).
-        self.wpe: nn.Embedding = nn.Embedding(config.block_size, config.n_embed)
+        self.wpe: nn.Embedding = nn.Embedding(config.max_seq_len, config.n_embed)
         # Hidden layers in the middle, the transformer blocks
         self.h: nn.ModuleList = nn.ModuleList(
             [Block(config) for _ in range(config.n_layer)]
@@ -162,9 +162,9 @@ class GPT2(nn.Module):
 
     def forward(self, input_token_ids):
         B, T = input_token_ids.shape
-        if T > self.config.block_size:
+        if T > self.config.max_seq_len:
             raise ValueError(
-                f"Sequence length {T} exceeds block_size {self.config.block_size}"
+                f"Sequence length {T} exceeds max_seq_len {self.config.max_seq_len}"
             )
 
         # B, T, n_embed
